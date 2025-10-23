@@ -371,7 +371,7 @@ class _HomePageState extends State<HomePage> {
       return Container(
         padding: const EdgeInsets.all(12),
         color: Colors.grey.shade200,
-        child: const Center(child: Text("Desteklenmeyen medya türü")),
+        child: const Center(child: Text("Desteklenmeyen medya türü.")),
       );
     }
   }
