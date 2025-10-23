@@ -27,3 +27,28 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+# Flutter build and generated files
+.flutter-versions
+.melos_tool/
+.flutter_export_environment.sh
+
+# Android specific
+android/.gradle/
+android/local.properties
+android/app/build/
+android/build/
+
+# iOS specific
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework/
+ios/Flutter/App.framework
+ios/Flutter/Generated.xcconfig
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Misc
+.DS_Store
+*.iml
+.vscode/
+.idea/
+
