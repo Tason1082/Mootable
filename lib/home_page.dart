@@ -8,7 +8,11 @@ import 'comment_page.dart';
 import 'post_page.dart';
 import 'user_posts_page.dart';
 import 'saved_posts_page.dart';
+import 'TimeAgo.dart';
 
+// ✅ Yeni doğru import
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 // 🔹 Profil Düzenleme Sayfası
 class EditProfilePage extends StatefulWidget {
   final String userId;
@@ -398,47 +402,69 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      // 🔹 Sağ Drawer (Profil)
       endDrawer: FractionallySizedBox(
         widthFactor: 0.55,
         child: Drawer(
           shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(topLeft: Radius.circular(24), bottomLeft: Radius.circular(24)),
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(24),
+              bottomLeft: Radius.circular(24),
+            ),
           ),
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const ListTile(
-                    leading: Icon(Icons.person),
-                    title: Text("Profil", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18))),
+                ListTile(
+                  leading: const Icon(Icons.person),
+                  title: Text(
+                    AppLocalizations.of(context)!.profile,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
                 const Divider(),
                 Center(
                   child: GestureDetector(
                     onTap: _uploadProfileImage,
                     child: CircleAvatar(
                       radius: 40,
-                      backgroundImage: profileImageUrl != null ? NetworkImage(profileImageUrl!) : null,
-                      child: profileImageUrl == null ? const Icon(Icons.add_a_photo, size: 30) : null,
+                      backgroundImage:
+                      profileImageUrl != null ? NetworkImage(profileImageUrl!) : null,
+                      child: profileImageUrl == null
+                          ? const Icon(Icons.add_a_photo, size: 30)
+                          : null,
                     ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 Center(
-                  child: Text(username != null ? "@$username" : "@yükleniyor...",
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: Colors.black87)),
+                  child: Text(
+                    username != null
+                        ? "@$username"
+                        : AppLocalizations.of(context)!.loadingUser,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
                 if (bio != null && bio!.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.all(8.0),
-                    child: Text(bio!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 14, color: Colors.black54)),
+                    child: Text(
+                      bio!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: Colors.black54),
+                    ),
                   ),
                 const SizedBox(height: 20),
                 ListTile(
                   leading: const Icon(Icons.edit),
-                  title: const Text("Profilini Düzenle"),
+                  title: Text(AppLocalizations.of(context)!.editProfile),
                   onTap: () async {
                     if (user != null) {
                       final updated = await Navigator.push(
@@ -457,13 +483,16 @@ class _HomePageState extends State<HomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.article_outlined),
-                  title: const Text("Paylaştıkların"),
+                  title: Text(AppLocalizations.of(context)!.yourPosts),
                   onTap: () {
                     if (user != null && username != null) {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => UserPostsPage(userId: user!.id, username: username!),
+                          builder: (_) => UserPostsPage(
+                            userId: user!.id,
+                            username: username!,
+                          ),
                         ),
                       );
                     }
@@ -471,7 +500,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.bookmark),
-                  title: const Text("Kaydedilenler"),
+                  title: Text(AppLocalizations.of(context)!.savedPosts),
                   onTap: () {
                     if (user != null) {
                       Navigator.push(
@@ -486,7 +515,10 @@ class _HomePageState extends State<HomePage> {
                 const Spacer(),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text("Çıkış Yap", style: TextStyle(color: Colors.red)),
+                  title: Text(
+                    AppLocalizations.of(context)!.logout,
+                    style: const TextStyle(color: Colors.red),
+                  ),
                   onTap: _logout,
                 ),
               ],
@@ -494,6 +526,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
+
 
       // 🔹 Gönderiler
       body: _loading
@@ -523,7 +556,10 @@ class _HomePageState extends State<HomePage> {
                       child: profile?["avatar_url"] == null ? const Icon(Icons.person) : null,
                     ),
                     title: Text(profile?["username"] ?? "Anonim"),
-                    subtitle: Text(post["created_at"].toString()),
+                    subtitle: Text(
+                      TimeAgo.format(DateTime.parse(post["created_at"])),
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
+                    ),
                   ),
                   if (post["image_url"] != null)
                     ClipRRect(

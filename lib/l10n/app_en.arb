@@ -1,0 +1,9 @@
+
+{"@@locale": "en",
+  "profile": "Profile",
+  "editProfile": "Edit Profile",
+  "yourPosts": "Your Posts",
+  "savedPosts": "Saved Posts",
+  "logout": "Logout",
+  "loadingUser": "@loading..."
+}
