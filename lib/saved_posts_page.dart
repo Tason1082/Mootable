@@ -14,17 +14,56 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
   List<Map<String, dynamic>> _savedPosts = [];
   bool _loading = true;
 
+  // ✅ Sayfalama değişkenleri
+  int _limit = 15;
+  int _offset = 0;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  late ScrollController _scrollController;
+
   @override
   void initState() {
     super.initState();
     _fetchSavedPosts();
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200 &&
+          !_isLoadingMore &&
+          _hasMore) {
+        _fetchSavedPosts(loadMore: true);
+      }
+    });
   }
 
-  Future<void> _fetchSavedPosts() async {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchSavedPosts({bool loadMore = false}) async {
+    if (_isLoadingMore || (!_hasMore && loadMore)) return;
+
+    if (!loadMore) setState(() => _loading = true);
+    setState(() => _isLoadingMore = true);
+
+    // 🔹 15'er 15'er kaydedilen post ID'lerini çekiyoruz
     final saves = await Supabase.instance.client
         .from("saves")
         .select("post_id")
-        .eq("user_id", widget.userId);
+        .eq("user_id", widget.userId)
+        .range(_offset, _offset + _limit - 1)
+        .order("id", ascending: false);
+
+    if (saves.isEmpty) {
+      setState(() {
+        _hasMore = false;
+        _isLoadingMore = false;
+        _loading = false;
+      });
+      return;
+    }
 
     List<Map<String, dynamic>> posts = [];
 
@@ -46,7 +85,13 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     }
 
     setState(() {
-      _savedPosts = posts;
+      if (loadMore) {
+        _savedPosts.addAll(posts);
+      } else {
+        _savedPosts = posts;
+      }
+      _offset += _limit;
+      _isLoadingMore = false;
       _loading = false;
     });
   }
@@ -56,7 +101,38 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     return lowerUrl.endsWith('.mp4') ||
         lowerUrl.endsWith('.mov') ||
         lowerUrl.endsWith('.avi') ||
-        lowerUrl.endsWith('.mkv');
+        lowerUrl.endsWith('.mkv') ||
+        lowerUrl.endsWith('.webm');
+  }
+
+  Widget _buildThumbnail(String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return Container(
+        color: Colors.grey[200],
+        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+      );
+    }
+
+    if (_isVideo(imageUrl)) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          // Küçük video önizlemesi
+          _VideoThumbnail(videoUrl: imageUrl),
+          const Center(
+            child: Icon(Icons.play_circle_fill,
+                color: Colors.white70, size: 36),
+          ),
+        ],
+      );
+    } else {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) =>
+        const Icon(Icons.broken_image, color: Colors.grey),
+      );
+    }
   }
 
   @override
@@ -67,66 +143,118 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
           ? const Center(child: CircularProgressIndicator())
           : _savedPosts.isEmpty
           ? const Center(child: Text("Henüz kaydedilen gönderi yok."))
-          : ListView.builder(
-        itemCount: _savedPosts.length,
-        itemBuilder: (context, index) {
-          final post = _savedPosts[index];
-          final profile = post["profiles"];
-          final imageUrl = post["image_url"];
-
-          return Card(
-            margin: const EdgeInsets.all(10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            elevation: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  leading: CircleAvatar(
-                    backgroundImage: profile?["avatar_url"] != null
-                        ? NetworkImage(profile["avatar_url"])
-                        : null,
-                    child: profile?["avatar_url"] == null
-                        ? const Icon(Icons.person)
-                        : null,
-                  ),
-                  title: Text(profile?["username"] ?? "Anonim"),
-                  subtitle:
-                  Text(post["created_at"].toString().substring(0, 16)),
-                ),
-
-                // 🔍 Görsel veya video kontrolü
-                if (imageUrl != null && imageUrl.isNotEmpty)
-                  _isVideo(imageUrl)
-                      ? _VideoPlayerWidget(videoUrl: imageUrl)
-                      : ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(15),
-                      bottomRight: Radius.circular(15),
-                    ),
-                    child: Image.network(
-                      imageUrl,
-                      width: double.infinity,
-                      height: MediaQuery.of(context).size.height * 0.4,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Text(post["content"] ?? ""),
-                ),
-              ],
-            ),
-          );
+          : RefreshIndicator(
+        onRefresh: () async {
+          _offset = 0;
+          _hasMore = true;
+          await _fetchSavedPosts();
         },
+        child: GridView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.all(4),
+          gridDelegate:
+          const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3, // ✅ 3 sütun
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+          ),
+          itemCount: _savedPosts.length + 1,
+          itemBuilder: (context, index) {
+            if (index == _savedPosts.length) {
+              if (_hasMore) {
+                return const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              } else {
+                return const SizedBox.shrink();
+              }
+            }
+
+            final post = _savedPosts[index];
+            final imageUrl = post["image_url"];
+            return GestureDetector(
+              onTap: () {
+                // 🔹 İstersen burada tıklanınca gönderiyi detaylı gösterebilirsin
+                showDialog(
+                  context: context,
+                  builder: (_) => Dialog(
+                    backgroundColor: Colors.black,
+                    insetPadding:
+                    const EdgeInsets.symmetric(horizontal: 10),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        _isVideo(imageUrl)
+                            ? _VideoPlayerWidget(videoUrl: imageUrl)
+                            : Image.network(imageUrl,
+                            fit: BoxFit.contain),
+                        Positioned(
+                          top: 10,
+                          right: 10,
+                          child: IconButton(
+                            icon: const Icon(Icons.close,
+                                color: Colors.white, size: 28),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: _buildThumbnail(imageUrl),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 }
 
+// 🔹 Küçük video thumbnail (önizleme) için sessiz video widget
+class _VideoThumbnail extends StatefulWidget {
+  final String videoUrl;
+  const _VideoThumbnail({required this.videoUrl});
+
+  @override
+  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<_VideoThumbnail> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        _controller.setVolume(0);
+        _controller.play();
+        _controller.setLooping(true);
+        setState(() => _initialized = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _initialized
+        ? VideoPlayer(_controller)
+        : Container(color: Colors.grey[300]);
+  }
+}
+
+// 🔹 Tam video oynatma widget (diyalog içinde)
 class _VideoPlayerWidget extends StatefulWidget {
   final String videoUrl;
   const _VideoPlayerWidget({required this.videoUrl});
@@ -138,14 +266,14 @@ class _VideoPlayerWidget extends StatefulWidget {
 class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
   late VideoPlayerController _controller;
   bool _initialized = false;
-  bool _muted = true; // 🔇 Başlangıçta sessiz
+  bool _muted = true;
 
   @override
   void initState() {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
       ..initialize().then((_) {
-        _controller.setVolume(0.0); // sessiz başlat
+        _controller.setVolume(0.0);
         setState(() => _initialized = true);
       });
   }
@@ -175,8 +303,6 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
         alignment: Alignment.center,
         children: [
           VideoPlayer(_controller),
-
-          // ▶️ / ⏸️ Oynatma butonu
           IconButton(
             icon: Icon(
               _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
@@ -191,8 +317,6 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
               });
             },
           ),
-
-          // 🔊 Ses aç/kapa butonu (sağ alt köşede)
           Positioned(
             bottom: 8,
             right: 8,
@@ -210,3 +334,4 @@ class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
     );
   }
 }
+

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'signup_page.dart';
 import 'error_handler.dart';
-import 'InterestSelectionPage.dart'; // Hobiler sayfası
-import 'home_page.dart'; // HomePage
+import 'InterestSelectionPage.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,34 +24,32 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       final user = response.user;
+
       if (user != null) {
         final supabase = Supabase.instance.client;
 
-        // 🔹 Kullanıcının user_interests tablosunda kayıtlı hobisi var mı?
+        // Kullanıcının ilgilerini kontrol et
         final existingInterests = await supabase
             .from('user_interests')
             .select()
             .eq('user_id', user.id);
 
-        if (existingInterests.isNotEmpty) {
-          // Daha önce seçim yaptıysa → direkt HomePage
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const HomePage()),
-            );
-          }
-        } else {
-          // Daha önce seçim yapmadıysa → InterestSelectionPage
-          if (mounted) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const InterestSelectionPage()),
-            );
-          }
-        }
-      }
+        if (!mounted) return;
 
+        if (existingInterests.isNotEmpty) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HomePage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const InterestSelectionPage()),
+          );
+        }
+      } else {
+        ErrorHandler.showError(context, "Giriş başarısız, lütfen tekrar deneyin.");
+      }
     } catch (e) {
       ErrorHandler.showError(context, e);
     }
@@ -134,5 +132,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-
-
