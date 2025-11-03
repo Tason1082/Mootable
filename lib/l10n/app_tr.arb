@@ -5,5 +5,18 @@
   "yourPosts": "Paylaştıkların",
   "savedPosts": "Kaydedilenler",
   "logout": "Çıkış Yap",
-  "loadingUser": "@yükleniyor..."
+  "loadingUser": "@yükleniyor...",
+  "settings": "Ayarlar",
+  "home": "Ana sayfa",
+  "communities": "Topluluklar",
+  "create": "Oluştur",
+  "chat": "Sohbet",
+  "inbox": "Gelen Kutusu",
+  "darkMode": "Karanlık Mod",
+  "language": "Dil Ayarları",
+  "about": "Hakkında",
+  "darkModeSubtitle": "Uygulama temasını değiştir",
+  "current": "Şu an",
+  "notifications": "Bildirimler",
+  "selectLanguage": "Dil Seçin"
 }

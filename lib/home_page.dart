@@ -17,7 +17,7 @@ import 'video_player_widget.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'edit_profile_page.dart';
-
+import 'settings_page.dart';
 // 🔹 Ana Sayfa
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -502,6 +502,17 @@ class _HomePageState extends State<HomePage> {
                     }
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: Text(AppLocalizations.of(context)!.settings),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    );
+                  },
+                ),
+
                 const Spacer(),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.red),
@@ -644,7 +655,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
 
-      // 🔹 Alt Navigasyon Bar
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -652,26 +662,30 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Ana sayfa"),
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.groups_3_outlined),
-            label: "Topluluklar",
+            icon: const Icon(Icons.home),
+            label: AppLocalizations.of(context)!.home,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_box_outlined),
-            label: "Oluştur",
+            icon: const Icon(Icons.groups_3_outlined),
+            label: AppLocalizations.of(context)!.communities,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: "Sohbet",
+            icon: const Icon(Icons.add_box_outlined),
+            label: AppLocalizations.of(context)!.create,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications_none),
-            label: "Gelen Kutusu",
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: AppLocalizations.of(context)!.chat,
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.notifications_none),
+            label: AppLocalizations.of(context)!.inbox,
           ),
         ],
       ),
+
     );
   }
 }

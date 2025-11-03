@@ -5,5 +5,18 @@
   "yourPosts": "Your Posts",
   "savedPosts": "Saved Posts",
   "logout": "Logout",
-  "loadingUser": "@loading..."
+  "loadingUser": "@loading...",
+  "settings": "Settings",
+  "home": "Home",
+  "communities": "Communities",
+  "create": "Create",
+  "chat": "Chat",
+  "inbox": "Inbox",
+  "darkMode": "Dark Mode",
+  "language": "Language",
+  "about": "About",
+  "darkModeSubtitle": "Change the app theme",
+  "current": "Current",
+  "notifications": "Notifications",
+  "selectLanguage": "Select Language"
 }
