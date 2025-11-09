@@ -360,7 +360,15 @@ class _HomePageState extends State<HomePage> {
           icon: const Icon(Icons.menu),
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
-        title: const Text("Mootable"),
+
+        // 🔹 BURADA "Mootable" yerine LOGO EKLENDİ:
+        title: Image.asset(
+          'assets/logo.jpeg',   // Logonun yolu (pubspec.yaml’da tanımlı olmalı)
+          height: 40,           // AppBar’a sığması için ideal yükseklik
+        ),
+
+        centerTitle: true, // Logoyu ortalar
+
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
@@ -368,12 +376,10 @@ class _HomePageState extends State<HomePage> {
               onTap: () => _scaffoldKey.currentState?.openEndDrawer(),
               child: CircleAvatar(
                 radius: 18,
-                backgroundImage:
-                profileImageUrl != null
+                backgroundImage: profileImageUrl != null
                     ? NetworkImage(profileImageUrl!)
                     : null,
-                child:
-                profileImageUrl == null
+                child: profileImageUrl == null
                     ? const Icon(Icons.person, size: 22)
                     : null,
               ),
@@ -382,7 +388,9 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      endDrawer: FractionallySizedBox(
+
+
+  endDrawer: FractionallySizedBox(
         widthFactor: 0.55,
         child: Drawer(
           shape: const RoundedRectangleBorder(

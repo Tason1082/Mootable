@@ -65,15 +65,14 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                "Mootable",
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
+              // 🔹 "Mootable" yerine logo ikonu
+              Image.asset(
+                'assets/logo.jpeg', // Logonun yolu (pubspec.yaml’da tanımlı olmalı)
+                height: 100,
               ),
+
               const SizedBox(height: 40),
+
               TextField(
                 controller: _emailController,
                 decoration: const InputDecoration(
@@ -82,6 +81,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 20),
+
               TextField(
                 controller: _passwordController,
                 obscureText: true,
@@ -91,6 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 30),
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -108,7 +109,9 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -131,4 +134,5 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+
 }
