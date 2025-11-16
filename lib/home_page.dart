@@ -13,6 +13,7 @@ import 'TimeAgo.dart';
 import 'dart:typed_data' as typed_data;
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'video_player_widget.dart';
+import 'CreateCommunityPage.dart';
 // ✅ Yeni doğru import
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -62,6 +63,67 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+  Widget _buildLeftMenu() {
+    return SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 20),
+          ListTile(
+            leading: const Icon(Icons.add), // + işareti
+            title: Text(
+              AppLocalizations.of(context)!.createCommunity, // "Topluluk Oluştur"
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            onTap: () {
+              // Topluluk oluşturma sayfasına yönlendirme
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CreateCommunityPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  void openLeftSideSheet() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withOpacity(0.4),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (_, __, ___) {
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Material(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+            child: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.5, // 👉 YARIM EKRAN
+              child: Drawer( // kendi drawer içeriğini buraya koy
+                child: _buildLeftMenu(),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (_, anim, __, child) {
+        return Transform.translate(
+          offset: Offset(-300 * (1 - anim.value), 0),
+          child: child,
+        );
+      },
+    );
   }
 
   Future<void> _fetchUserProfile() async {
@@ -358,7 +420,8 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          onPressed: openLeftSideSheet,
+
         ),
 
         // 🔹 BURADA "Mootable" yerine LOGO EKLENDİ:
@@ -697,6 +760,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+
 
 
 

@@ -18,5 +18,11 @@
   "darkModeSubtitle": "Uygulama temasını değiştir",
   "current": "Şu an",
   "notifications": "Bildirimler",
-  "selectLanguage": "Dil Seçin"
+  "selectLanguage": "Dil Seçin",
+  "createCommunity": "Topluluk Oluştur",
+  "communityName": "Topluluk Adı",
+  "communityDescription": "Topluluk Açıklaması",
+  "enterCommunityName": "Lütfen topluluk adı girin"
 }
+
+

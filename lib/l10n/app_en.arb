@@ -18,5 +18,9 @@
   "darkModeSubtitle": "Change the app theme",
   "current": "Current",
   "notifications": "Notifications",
-  "selectLanguage": "Select Language"
+  "selectLanguage": "Select Language",
+  "createCommunity": "Create Community",
+  "communityName": "Community Name",
+  "communityDescription": "Community Description",
+  "enterCommunityName": "Please enter a community name"
 }
