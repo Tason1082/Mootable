@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
+import 'CommunityCustomizePage.dart';
+
 class CreateCommunityPage extends StatefulWidget {
   const CreateCommunityPage({super.key});
 
@@ -20,18 +22,14 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
     super.dispose();
   }
 
-  void _createCommunity() {
+  void _goToNextPage() {
     if (_formKey.currentState!.validate()) {
-      // Burada Supabase veya backend entegrasyonu yapılabilir
-      final name = _nameController.text.trim();
-      final description = _descriptionController.text.trim();
-
-      // Şimdilik sadece mesaj gösterelim
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Topluluk oluşturuldu: $name')),
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CommunityCustomizePage(),
+        ),
       );
-
-      Navigator.pop(context); // Sayfayı kapat
     }
   }
 
@@ -64,14 +62,15 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                  labelText: AppLocalizations.of(context)!.communityDescription,
+                  labelText:
+                  AppLocalizations.of(context)!.communityDescription,
                 ),
                 maxLines: 3,
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _createCommunity,
-                child: Text(AppLocalizations.of(context)!.create),
+                onPressed: _goToNextPage,
+                child: Text("Sonraki"),
               ),
             ],
           ),
@@ -80,3 +79,4 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
     );
   }
 }
+
