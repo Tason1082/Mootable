@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 class SavedPostsPage extends StatefulWidget {
   final String userId;
   const SavedPostsPage({super.key, required this.userId});
@@ -137,12 +137,13 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text("Kaydedilen Gönderiler")),
+      appBar: AppBar(title: Text(l10n.saved_posts_title)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _savedPosts.isEmpty
-          ? const Center(child: Text("Henüz kaydedilen gönderi yok."))
+          ? Center(child: Text(l10n.no_saved_posts))
           : RefreshIndicator(
         onRefresh: () async {
           _offset = 0;

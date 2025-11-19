@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'home_page.dart';
 
 class CommunityTypePage extends StatefulWidget {
   final String name;
@@ -23,82 +27,108 @@ class CommunityTypePage extends StatefulWidget {
 class _CommunityTypePageState extends State<CommunityTypePage> {
   String communityType = "public"; // public, restricted, private
   bool isAdult = false;
+  bool isLoading = false;
 
-  void _finish() async {
-    // Burada Supabase kaydı yapılacak
-    // Şimdi sadece başka sayfa gösterebiliriz
-    Navigator.pop(context, {
-      "name": widget.name,
-      "description": widget.description,
-      "banner": widget.bannerUrl,
-      "icon": widget.iconUrl,
-      "topics": widget.selectedTopics,
-      "type": communityType,
-      "adult": isAdult,
-    });
+  Future<void> _finish() async {
+    final supabase = Supabase.instance.client;
+
+    setState(() => isLoading = true);
+
+    try {
+      final userId = supabase.auth.currentUser?.id;
+
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppLocalizations.of(context)!.session_not_found)),
+        );
+        return;
+      }
+
+      await supabase.from('communities').insert({
+        'name': widget.name,
+        'description': widget.description,
+        'banner_url': widget.bannerUrl,
+        'icon_url': widget.iconUrl,
+        'topics': widget.selectedTopics,
+        'type': communityType,
+        'is_adult': isAdult,
+        'created_by': userId,
+      }).select();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+            (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Topluluk türünü seç"),
+        title: Text(l10n.community_type_title),
         centerTitle: true,
         actions: [
           TextButton(
-            onPressed: _finish,
-            child: const Text("Sonraki", style: TextStyle(fontSize: 16)),
+            onPressed: isLoading ? null : _finish,
+            child: isLoading
+                ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : Text(l10n.create, style: const TextStyle(fontSize: 16)),
           )
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            const Text(
-              "Topluluğunu kimlerin görüntüleyip katkıda bulunabileceğini belirle. "
-                  "Sadece açık topluluklar aramalarda görünür.",
-              style: TextStyle(fontSize: 15),
-            ),
+            Text(l10n.description_text, style: const TextStyle(fontSize: 15)),
             const SizedBox(height: 16),
-            const Text(
-              "Önemli: Ayarlamalarını yaptıysan topluluk türünü yalnızca Reddit onayıyla değiştirebilirsin.",
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
-
+            Text(l10n.important_note,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(height: 30),
-
             _buildRadio(
-              "Herkese açık",
-              "Herkes arama yapabilir, görüntüleyebilir ve katkıda bulunabilir.",
+              l10n.public_title,
+              l10n.public_subtitle,
               "public",
               Icons.add_circle_outline,
             ),
-
             _buildRadio(
-              "Kısıtlanmış",
-              "Herkes görüntüleyebilir ancak kimlerin katkıda bulunabileceğini kısıtla.",
+              l10n.restricted_title,
+              l10n.restricted_subtitle,
               "restricted",
               Icons.remove_red_eye_outlined,
             ),
-
             _buildRadio(
-              "Özel",
-              "Sadece onaylı üyeler görüntüleyebilir ve katkıda bulunabilir.",
+              l10n.private_title,
+              l10n.private_subtitle,
               "private",
               Icons.lock_outline,
             ),
-
             const Divider(height: 40),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    "Yetişkinlere Yönelik (18+) \nGörüntülemek için 18 yaşından büyük olmak gerekir",
-                    style: TextStyle(fontSize: 15),
+                    l10n.adult_label,
+                    style: const TextStyle(fontSize: 15),
                   ),
                 ),
                 Switch(
@@ -113,8 +143,7 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
     );
   }
 
-  Widget _buildRadio(
-      String title, String subtitle, String value, IconData icon) {
+  Widget _buildRadio(String title, String subtitle, String value, IconData icon) {
     return InkWell(
       onTap: () => setState(() => communityType = value),
       child: Padding(
@@ -128,8 +157,7 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style:
-                      const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   Text(subtitle, style: const TextStyle(fontSize: 13)),
                 ],
               ),
@@ -147,3 +175,4 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
     );
   }
 }
+

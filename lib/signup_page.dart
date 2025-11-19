@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
 import 'home_page.dart';
-import 'error_handler.dart'; // 🔥 Türkçe hata yöneticisi
+import 'error_handler.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -16,6 +17,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final _password = TextEditingController();
 
   Future<void> _signUp() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       final response = await Supabase.instance.client.auth.signUp(
         email: _email.text.trim(),
@@ -23,37 +25,39 @@ class _SignUpPageState extends State<SignUpPage> {
       );
 
       if (response.user != null) {
-        // 🔹 Kullanıcı profili oluştur
+        // Kullanıcı profili oluştur
         await Supabase.instance.client.from("profiles").insert({
           "id": response.user!.id,
           "username": _email.text.split("@")[0],
         });
 
-        // 🔹 Geri yönlendir (login sayfasına veya ana sayfaya)
+        // Geri yönlendir (login sayfasına veya ana sayfaya)
         Navigator.pop(context);
       }
     } catch (e) {
-      // 🔥 Global ErrorHandler ile tüm hatalar Türkçeye çevrilip gösterilir
+      // Global ErrorHandler ile tüm hatalar çevrilebilir
       ErrorHandler.showError(context, e);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Üye Ol")),
+      appBar: AppBar(title: Text(l10n.signup_button)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             TextField(
               controller: _email,
-              decoration: const InputDecoration(labelText: "Email"),
+              decoration: InputDecoration(labelText: l10n.login_email_label),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _password,
-              decoration: const InputDecoration(labelText: "Şifre"),
+              decoration: InputDecoration(labelText: l10n.login_password_label),
               obscureText: true,
             ),
             const SizedBox(height: 20),
@@ -68,9 +72,9 @@ class _SignUpPageState extends State<SignUpPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  "Kaydol",
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                child: Text(
+                  l10n.signup_button,
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
                 ),
               ),
             ),

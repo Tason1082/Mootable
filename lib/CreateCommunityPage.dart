@@ -27,7 +27,10 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => const CommunityCustomizePage(),
+          builder: (_) => CommunityCustomizePage(
+            name: _nameController.text,
+            description: _descriptionController.text,
+          ),
         ),
       );
     }
@@ -62,15 +65,14 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: InputDecoration(
-                  labelText:
-                  AppLocalizations.of(context)!.communityDescription,
+                  labelText: AppLocalizations.of(context)!.communityDescription,
                 ),
                 maxLines: 3,
               ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _goToNextPage,
-                child: Text("Sonraki"),
+                child: const Text("Sonraki"),
               ),
             ],
           ),
@@ -79,4 +81,5 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
     );
   }
 }
+
 

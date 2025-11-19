@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String userId;
@@ -35,6 +36,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     setState(() => _saving = true);
 
+    final l10n = AppLocalizations.of(context)!;
+
     try {
       await Supabase.instance.client.from('profiles').update({
         'username': _usernameController.text.trim(),
@@ -43,14 +46,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profil başarıyla güncellendi ✅")),
+          SnackBar(content: Text(l10n.profile_saved_success)),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
-      print("Profil güncelleme hatası: $e");
+      print("Profile update error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Profil güncellenemedi ❌")),
+        SnackBar(content: Text(l10n.profile_saved_error)),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -59,9 +62,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Profilini Düzenle"),
+        title: Text(l10n.edit_profile_title),
         backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
@@ -71,41 +76,37 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: ListView(
             children: [
               const SizedBox(height: 10),
-              const Text(
-                "Kullanıcı Adı",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              Text(
+                l10n.username_label,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _usernameController,
                 decoration: InputDecoration(
-                  hintText: "Kullanıcı adını gir",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  hintText: l10n.username_hint,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.person_outline),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return "Kullanıcı adı boş olamaz";
+                    return l10n.username_empty_error;
                   }
                   return null;
                 },
               ),
               const SizedBox(height: 20),
-              const Text(
-                "Hakkında (isteğe bağlı)",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              Text(
+                l10n.bio_label,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _bioController,
                 maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: "Kendini kısaca tanıt...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  hintText: l10n.bio_hint,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.info_outline),
                 ),
               ),
@@ -122,11 +123,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   ),
                   onPressed: _saving ? null : _saveProfile,
                   icon: const Icon(Icons.save),
-                  label: _saving
-                      ? const Text("Kaydediliyor...",
-                      style: TextStyle(color: Colors.white))
-                      : const Text("Kaydet",
-                      style: TextStyle(color: Colors.white)),
+                  label: Text(
+                    _saving ? l10n.saving_button : l10n.save_button,
+                    style: const TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
             ],
@@ -136,3 +136,4 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 }
+

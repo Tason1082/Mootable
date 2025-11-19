@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'topic_data.dart';
-import 'community_type_page.dart';
+import 'community_type_page.dart'; // Bu dosyan senin zaten mevcut
 
 class TopicSelectionPage extends StatefulWidget {
-  const TopicSelectionPage({super.key});
+  final String name;
+  final String description;
+  final String? bannerUrl;
+  final String? iconUrl;
+
+  const TopicSelectionPage({
+    super.key,
+    required this.name,
+    required this.description,
+    this.bannerUrl,
+    this.iconUrl,
+  });
 
   @override
   State<TopicSelectionPage> createState() => _TopicSelectionPageState();
@@ -24,9 +36,12 @@ class _TopicSelectionPageState extends State<TopicSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final topicsData = getTopicsData(l10n);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Topluluk konularını seç"),
+        title: Text(l10n.topic_selection_title),
         centerTitle: true,
         actions: [
           TextButton(
@@ -36,37 +51,31 @@ class _TopicSelectionPageState extends State<TopicSelectionPage> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => CommunityTypePage(
-                    name: "",
-                    description: "",
+                    name: widget.name,
+                    description: widget.description,
+                    bannerUrl: widget.bannerUrl,
+                    iconUrl: widget.iconUrl,
                     selectedTopics: selectedTopics,
                   ),
                 ),
               );
             }
                 : null,
-            child: const Text("Sonraki"),
+            child: Text(l10n.next_button),
           ),
         ],
       ),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            const Text(
-              "İlgilenen kullanıcıların topluluğunu bulmasına yardımcı olmak için en fazla 3 konu başlığı ekle.",
-              style: TextStyle(fontSize: 15),
-            ),
-
+            Text(l10n.topic_instruction, style: const TextStyle(fontSize: 15)),
             const SizedBox(height: 16),
-
             Text(
-              "${selectedTopics.length}/3 Konu",
+              l10n.topic_count(selectedTopics.length),
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 8),
-
             Wrap(
               spacing: 8,
               children: selectedTopics.map((t) {
@@ -77,9 +86,7 @@ class _TopicSelectionPageState extends State<TopicSelectionPage> {
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 20),
-
             ...topicsData.entries.map((entry) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -87,17 +94,14 @@ class _TopicSelectionPageState extends State<TopicSelectionPage> {
                   const SizedBox(height: 20),
                   Text(
                     entry.key,
-                    style: const TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
                     children: entry.value.map((topic) {
                       final isSelected = selectedTopics.contains(topic);
-
                       return ChoiceChip(
                         label: Text(topic),
                         selected: isSelected,
@@ -106,9 +110,7 @@ class _TopicSelectionPageState extends State<TopicSelectionPage> {
                         backgroundColor: Colors.white,
                         shape: StadiumBorder(
                           side: BorderSide(
-                            color: isSelected
-                                ? Colors.transparent
-                                : Colors.grey.shade400,
+                            color: isSelected ? Colors.transparent : Colors.grey.shade400,
                           ),
                         ),
                       );

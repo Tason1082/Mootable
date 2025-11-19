@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home_page.dart';
-import 'login_page.dart'; // BackButton için import
+import 'login_page.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'topic_data.dart';
 
 class InterestSelectionPage extends StatefulWidget {
   final List<String>? initialSelected;
+
   const InterestSelectionPage({Key? key, this.initialSelected}) : super(key: key);
 
   @override
@@ -12,103 +15,15 @@ class InterestSelectionPage extends StatefulWidget {
 }
 
 class _InterestSelectionPageState extends State<InterestSelectionPage> {
-  final Map<String, List<String>> categories = {
-    "İş Dünyası ve Finans": [
-      "Hisse Senetleri ve Yatırım",
-      "Bireysel Finans",
-      "borsavefon",
-      "Fırsatlar ve Pazar Yeri",
-      "Emlak",
-      "Finanzen",
-      "İş Dünyasından Haberler ve Tartışmalar",
-      "Kripto",
-      "WallStreetBets",
-      "Startup ve Girişimcilik",
-    ],
-    "Eğitim ve Kariyer": [
-      "liseliler",
-      "Okul ve Eğitim",
-      "ODTU",
-      "Kariyer",
-      "YurtdisiUni",
-      "turkishlearning",
-      "Teaching",
-      "remotework",
-      "sysadmin",
-      "jobs",
-    ],
-    "Beşeri Bilimler ve Hukuk": [
-      "Kamalizm",
-      "Hukuk",
-      "TarihiSeyler",
-      "Geçmiş",
-      "felsefe",
-      "Etik ve Felsefe",
-      "Legal News & Discussion",
-      "Yabancı Dil",
-      "Legal advice",
-      "Legal advice UK",
-    ],
-    "Spor": [
-      "Futbol",
-      "realmadrid",
-      "Formula 1",
-      "superlig",
-      "formula1TR",
-      "Motor Sporları",
-      "NBA",
-      "FenerbahceSK",
-      "Basketbol",
-      "Güreş ve Dövüş Sporları",
-    ],
-    "Oyunlar": [
-      "Aksiyon Oyunları",
-      "EA Sports FC",
-      "ClashRoyale",
-      "Path of Exile 2",
-      "Rol Yapma Oyunları",
-      "Cyberpunk 2077",
-      "Oyun Haberleri ve Tartışmaları",
-      "Genshin Impact",
-      "Strateji Oyunları",
-      "Macera Oyunları",
-    ],
-    "İnternet Kültürü": [
-      "tamamahbapengelli",
-      "SacmaBirSub",
-      "bbaldiback",
-      "Komik",
-      "Meme'ler",
-      "İlginç",
-      "Cringe ve Facepalm",
-      "Reddit Meta",
-      "Hayvanlar ve Evcil Hayvanlar",
-      "dewrim",
-    ],
-    "Gezilecek Yerler": [
-      "Orta Doğu'daki Yerler",
-      "Avrupa'daki Yerler",
-      "istanbul",
-      "Seyahat ve Tatil",
-      "Kuzey Amerika'daki Yerler",
-      "Europe",
-      "Asya'daki Yerler",
-      "Izmir",
-      "Travel inspiration",
-      "germany",
-    ],
-    "Soru-Cevap/Öykü": [
-      "Soru-Cevap",
-      "AskTurkey",
-      "Am I the A**hole",
-      "Am I Overreacting",
-      "No Stupid Questions",
-      "Advice",
-    ],
-  };
-
-
+  late Map<String, List<String>> categories;
   final Set<String> selected = {};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // topic_data.dart'tan lokalizasyon ile kategorileri alıyoruz
+    categories = getTopicsData(AppLocalizations.of(context)!);
+  }
 
   @override
   void initState() {
@@ -130,17 +45,15 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
 
   Future<void> _onContinue() async {
     if (selected.isEmpty) return;
-
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
-
       if (user == null) throw Exception("Kullanıcı oturumu bulunamadı");
 
       // Eski kayıtları sil
       await supabase.from('user_interests').delete().eq('user_id', user.id);
 
-      // Yeni hobileri user_interests tablosuna ekle
+      // Yeni ilgi alanlarını ekle
       final List<Map<String, dynamic>> rows = selected.map((interest) {
         return {
           'user_id': user.id,
@@ -159,13 +72,16 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
         );
       }
     } catch (e) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("İlgi alanları kaydedilemedi: $e")),
+        SnackBar(content: Text("${l10n.interest_save_error}: $e")),
       );
     }
   }
 
   Widget _buildCategory(String title, List<String> tags) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Column(
@@ -173,9 +89,9 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
         children: [
           Row(
             children: [
-              if (title == "Gezilecek Yerler")
+              if (title == l10n.category_travel)
                 const Icon(Icons.public, size: 20)
-              else if (title == "Soru-Cevap/Öykü")
+              else if (title == l10n.category_qa)
                 const Icon(Icons.edit, size: 20)
               else
                 const Icon(Icons.insert_emoticon, size: 20),
@@ -200,9 +116,7 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
                 checkmarkColor: Theme.of(context).colorScheme.primary,
                 backgroundColor: Colors.grey.shade200,
                 labelStyle: TextStyle(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.black87,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black87,
                 ),
               );
             }).toList(),
@@ -214,30 +128,29 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final bool canContinue = selected.isNotEmpty;
 
     return WillPopScope(
       onWillPop: () async {
-        // Sistem geri tuşuna basarsa LoginPage'e dön
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginPage()),
         );
-        return false; // default pop'u engelle
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () {
-              // BackButton ile LoginPage'e dön
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
               );
             },
           ),
-          title: const Text("İlgi Alanlarını Seç"),
+          title: Text(l10n.interest_selection_title),
         ),
         body: SafeArea(
           child: Column(
@@ -247,11 +160,11 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
                   padding: const EdgeInsets.only(bottom: 16),
                   children: [
                     const SizedBox(height: 12),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        "En az 1 konu seçin",
-                        style: TextStyle(fontSize: 14, color: Colors.black54),
+                        l10n.select_at_least_one_topic,
+                        style: const TextStyle(fontSize: 14, color: Colors.black54),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -279,8 +192,8 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
               ),
               child: Text(
                 canContinue
-                    ? "Devam Et (${selected.length})"
-                    : "Devam etmek için en az 1 konu seç",
+                    ? "${l10n.continue_text} (${selected.length})"
+                    : l10n.select_minimum_one_topic,
                 style: const TextStyle(fontSize: 16),
               ),
             ),
@@ -290,3 +203,4 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
     );
   }
 }
+

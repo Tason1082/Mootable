@@ -4,6 +4,7 @@ import 'signup_page.dart';
 import 'error_handler.dart';
 import 'InterestSelectionPage.dart';
 import 'home_page.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -17,6 +18,8 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   Future<void> _login() async {
+    final l10n = AppLocalizations.of(context)!;
+
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
@@ -48,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
           );
         }
       } else {
-        ErrorHandler.showError(context, "Giriş başarısız, lütfen tekrar deneyin.");
+        ErrorHandler.showError(context, l10n.login_failed);
       }
     } catch (e) {
       ErrorHandler.showError(context, e);
@@ -57,6 +60,8 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -65,33 +70,28 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // 🔹 "Mootable" yerine logo ikonu
               Image.asset(
-                'assets/logo.jpeg', // Logonun yolu (pubspec.yaml’da tanımlı olmalı)
+                'assets/logo.jpeg',
                 height: 100,
               ),
-
               const SizedBox(height: 40),
-
               TextField(
                 controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: "Email",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.login_email_label,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 20),
-
               TextField(
                 controller: _passwordController,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Şifre",
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.login_password_label,
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -103,15 +103,13 @@ class _LoginPageState extends State<LoginPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    "Giriş yap",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                  child: Text(
+                    l10n.login_button,
+                    style: const TextStyle(fontSize: 18, color: Colors.white),
                   ),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -119,9 +117,9 @@ class _LoginPageState extends State<LoginPage> {
                     MaterialPageRoute(builder: (_) => const SignUpPage()),
                   );
                 },
-                child: const Text(
-                  "Üye ol",
-                  style: TextStyle(
+                child: Text(
+                  l10n.signup_link,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Colors.deepPurple,
                     decoration: TextDecoration.underline,
@@ -134,5 +132,5 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-
 }
+
