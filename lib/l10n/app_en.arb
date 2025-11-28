@@ -161,5 +161,12 @@
   "continue_text": "Continue",
   "select_minimum_one_topic": "Select at least one topic to continue",
   "interest_save_error": "Failed to save interests",
-  "signup_button": "Sign up"
+  "signup_button": "Sign up",
+  "justNow": "just now",
+  "minuteAgo": "{count} minute ago",
+  "hourAgo": "{count} hour ago",
+  "dayAgo": "{count} day ago",
+  "weekAgo": "{count} week ago",
+  "monthAgo": "{count} mounth ago",
+  "yearAgo": "{count} year ago"
 }

@@ -87,7 +87,8 @@ class _PostAddPageState extends State<PostAddPage> {
     });
 
     setState(() => _loading = false);
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, true);
+
   }
 
   @override

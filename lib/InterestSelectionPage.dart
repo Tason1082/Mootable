@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'home_page.dart';
 import 'login_page.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'topic_data.dart';
+import 'community/topic_data.dart';
 
 class InterestSelectionPage extends StatefulWidget {
   final List<String>? initialSelected;

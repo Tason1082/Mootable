@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_player/video_player.dart'; // ✅ Video oynatıcı eklendi
+import 'package:video_player/video_player.dart';
+import 'community_explore_page.dart';
 import 'login_page.dart';
 import 'comment_page.dart';
 import 'post_page.dart';
@@ -13,12 +14,16 @@ import 'TimeAgo.dart';
 import 'dart:typed_data' as typed_data;
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'video_player_widget.dart';
-import 'CreateCommunityPage.dart';
-// ✅ Yeni doğru import
+import 'community/CreateCommunityPage.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'edit_profile_page.dart';
 import 'settings_page.dart';
+
+// YENİ MENÜ DOSYALARI
+import 'left_menu.dart';
+import 'right_profile_drawer.dart';
+
 // 🔹 Ana Sayfa
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,7 +42,7 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
 
-  // ✅ Sayfalama için eklenen değişkenler
+  // Sayfalama
   int _limit = 5;
   int _offset = 0;
   bool _isLoadingMore = false;
@@ -52,7 +57,6 @@ class _HomePageState extends State<HomePage> {
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
-        // Liste sonuna yaklaşıldı
         _fetchPosts(loadMore: true);
       }
     });
@@ -64,72 +68,10 @@ class _HomePageState extends State<HomePage> {
     _scrollController.dispose();
     super.dispose();
   }
-  Widget _buildLeftMenu() {
-    return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          ListTile(
-            leading: const Icon(Icons.add), // + işareti
-            title: Text(
-              AppLocalizations.of(context)!.createCommunity, // "Topluluk Oluştur"
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            onTap: () {
-              // Topluluk oluşturma sayfasına yönlendirme
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CreateCommunityPage(),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-
-  void openLeftSideSheet() {
-    showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: '',
-      barrierColor: Colors.black.withOpacity(0.4),
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (_, __, ___) {
-        return Align(
-          alignment: Alignment.centerLeft,
-          child: Material(
-            color: Colors.white,
-            borderRadius: const BorderRadius.only(
-              topRight: Radius.circular(24),
-              bottomRight: Radius.circular(24),
-            ),
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.5, // 👉 YARIM EKRAN
-              child: Drawer( // kendi drawer içeriğini buraya koy
-                child: _buildLeftMenu(),
-              ),
-            ),
-          ),
-        );
-      },
-      transitionBuilder: (_, anim, __, child) {
-        return Transform.translate(
-          offset: Offset(-300 * (1 - anim.value), 0),
-          child: child,
-        );
-      },
-    );
-  }
 
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
-    final profile =
-    await Supabase.instance.client
+    final profile = await Supabase.instance.client
         .from("profiles")
         .select("username, bio, avatar_url")
         .eq("id", user!.id)
@@ -150,9 +92,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final file = File(picked.path);
       final fileName =
-          "${user!.id}_${DateTime
-          .now()
-          .millisecondsSinceEpoch}.jpg";
+          "${user!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg";
       await Supabase.instance.client.storage
           .from('avatars')
           .upload(fileName, file);
@@ -172,25 +112,26 @@ class _HomePageState extends State<HomePage> {
       );
     } catch (e) {
       print("Profil yükleme hatası: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Profil yüklenemedi!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Profil yüklenemedi!")),
+      );
     }
   }
 
   Future<void> _fetchPosts({bool loadMore = false}) async {
     if (_isLoadingMore || (!_hasMore && loadMore)) return;
+
     if (!loadMore) setState(() => _loading = true);
     setState(() => _isLoadingMore = true);
-    final from = _offset;
-    final to = _offset + _limit - 1;
+
     final List<Map<String, dynamic>> posts = List<Map<String, dynamic>>.from(
       await Supabase.instance.client
           .from("posts")
           .select("id, content, image_url, created_at, user_id")
           .order("created_at", ascending: false)
-          .range(from, to),
+          .range(_offset, _offset + _limit - 1),
     );
+
     if (posts.isEmpty) {
       setState(() {
         _hasMore = false;
@@ -199,45 +140,45 @@ class _HomePageState extends State<HomePage> {
       });
       return;
     }
+
     List<Map<String, dynamic>> postsWithExtras = [];
     for (var post in posts) {
-      final profileMap =
-      await Supabase.instance.client
+      final profileMap = await Supabase.instance.client
           .from("profiles")
           .select("username, avatar_url")
           .eq("id", post["user_id"])
           .maybeSingle();
+
       final votesList = List<Map<String, dynamic>>.from(
         await Supabase.instance.client
             .from("votes")
             .select("user_id, vote")
             .eq("post_id", post["id"]),
       );
+
       final commentsList = List<Map<String, dynamic>>.from(
         await Supabase.instance.client
             .from("comments")
             .select("id")
             .eq("post_id", post["id"]),
       );
-      final savedMap =
-      await Supabase.instance.client
+
+      final savedMap = await Supabase.instance.client
           .from("saves")
           .select("id")
           .eq("post_id", post["id"])
           .eq("user_id", user!.id)
           .maybeSingle();
-      final upvotes = votesList
-          .where((v) => v["vote"] == 1)
-          .length;
-      final downvotes = votesList
-          .where((v) => v["vote"] == -1)
-          .length;
+
+      final upvotes = votesList.where((v) => v["vote"] == 1).length;
+      final downvotes = votesList.where((v) => v["vote"] == -1).length;
       final userVote =
           votesList.firstWhere(
                 (v) => v["user_id"] == user?.id,
             orElse: () => {"vote": 0},
           )["vote"] ??
               0;
+
       postsWithExtras.add({
         ...post,
         "profiles": profileMap,
@@ -247,15 +188,18 @@ class _HomePageState extends State<HomePage> {
         "is_saved": savedMap != null,
       });
     }
+
     setState(() {
       if (loadMore) {
         _posts.addAll(postsWithExtras);
       } else {
         _posts = postsWithExtras;
       }
+
       _offset += _limit;
       _isLoadingMore = false;
       _loading = false;
+      _hasMore = posts.length == _limit;
     });
   }
 
@@ -270,7 +214,6 @@ class _HomePageState extends State<HomePage> {
     final int previousVote = post["user_vote"] ?? 0;
     final int previousCount = post["votes_count"] ?? 0;
 
-    // UI'da hemen tepki
     setState(() {
       if (previousVote == vote) {
         post["user_vote"] = 0;
@@ -282,8 +225,7 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final existingVote =
-      await Supabase.instance.client
+      final existingVote = await Supabase.instance.client
           .from("votes")
           .select("vote")
           .eq("post_id", postId)
@@ -312,15 +254,14 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
-      // Hata durumunda UI rollback
       setState(() {
         post["user_vote"] = previousVote;
         post["votes_count"] = previousCount;
       });
       print("Vote error: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Oylama başarısız oldu!")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Oylama başarısız oldu!")),
+      );
     }
   }
 
@@ -331,7 +272,6 @@ class _HomePageState extends State<HomePage> {
     final index = _posts.indexWhere((p) => p["id"] == postId);
     if (index == -1) return;
 
-    // UI anında güncelle
     setState(() {
       _posts[index]["is_saved"] = !currentlySaved;
     });
@@ -350,7 +290,6 @@ class _HomePageState extends State<HomePage> {
         });
       }
     } catch (e) {
-      // Hata durumunda rollback
       setState(() {
         _posts[index]["is_saved"] = currentlySaved;
       });
@@ -361,26 +300,31 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _logout() async {
-    await Supabase.instance.client.auth.signOut();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const LoginPage()),
-    );
-  }
-
   void _onItemTapped(int index) {
+    if (index == 1) {
+      // Topluluk sayfasına git
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const CommunityExplorePage()),
+      );
+    }
     if (index == 2) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PostAddPage()),
-      ).then((_) => _fetchPosts());
+      ).then((value) {
+        if (value == true) {
+          _offset = 0;
+          _posts.clear();
+          _hasMore = true;
+          _fetchPosts();
+        }
+      });
     } else {
       setState(() => _selectedIndex = index);
     }
   }
 
-  // ✅ FOTO/VIDEO otomatik ayırıcı
   Widget _buildMediaWidget(String url) {
     final lowerUrl = url.toLowerCase();
 
@@ -400,8 +344,7 @@ class _HomePageState extends State<HomePage> {
         url,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder:
-            (context, error, stackTrace) =>
+        errorBuilder: (context, error, stackTrace) =>
         const Center(child: Icon(Icons.broken_image)),
       );
     } else {
@@ -417,20 +360,18 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: openLeftSideSheet,
-
+          onPressed: () => openLeftSideSheet(context), // YENİ
         ),
 
-        // 🔹 BURADA "Mootable" yerine LOGO EKLENDİ:
         title: Image.asset(
-          'assets/logo.jpeg',   // Logonun yolu (pubspec.yaml’da tanımlı olmalı)
-          height: 40,           // AppBar’a sığması için ideal yükseklik
+          'assets/logo.jpeg',
+          height: 40,
         ),
-
-        centerTitle: true, // Logoyu ortalar
+        centerTitle: true,
 
         actions: [
           Padding(
@@ -451,174 +392,31 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-
-
-  endDrawer: FractionallySizedBox(
-        widthFactor: 0.55,
-        child: Drawer(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(24),
-              bottomLeft: Radius.circular(24),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(
-                    AppLocalizations.of(context)!.profile,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-                const Divider(),
-                Center(
-                  child: GestureDetector(
-                    onTap: _uploadProfileImage,
-                    child: CircleAvatar(
-                      radius: 40,
-                      backgroundImage:
-                      profileImageUrl != null
-                          ? NetworkImage(profileImageUrl!)
-                          : null,
-                      child:
-                      profileImageUrl == null
-                          ? const Icon(Icons.add_a_photo, size: 30)
-                          : null,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    username != null
-                        ? "@$username"
-                        : AppLocalizations.of(context)!.loadingUser,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ),
-                if (bio != null && bio!.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      bio!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const Icon(Icons.edit),
-                  title: Text(AppLocalizations.of(context)!.editProfile),
-                  onTap: () async {
-                    if (user != null) {
-                      final updated = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                              EditProfilePage(
-                                userId: user!.id,
-                                initialUsername: username,
-                                initialBio: bio,
-                              ),
-                        ),
-                      );
-                      if (updated == true) _fetchUserProfile();
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.article_outlined),
-                  title: Text(AppLocalizations.of(context)!.yourPosts),
-                  onTap: () {
-                    if (user != null && username != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (_) =>
-                              UserPostsPage(
-                                userId: user!.id,
-                                username: username!,
-                              ),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.bookmark),
-                  title: Text(AppLocalizations.of(context)!.savedPosts),
-                  onTap: () {
-                    if (user != null) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => SavedPostsPage(userId: user!.id),
-                        ),
-                      );
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: Text(AppLocalizations.of(context)!.settings),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsPage()),
-                    );
-                  },
-                ),
-
-                const Spacer(),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: Text(
-                    AppLocalizations.of(context)!.logout,
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                  onTap: _logout,
-                ),
-              ],
-            ),
-          ),
-        ),
+      // 👉 Sağdaki Profil Menüsü Artık Ayrı Dosyada
+      endDrawer: RightProfileDrawer(
+        profileImageUrl: profileImageUrl,
+        username: username,
+        bio: bio,
+        onUploadProfileImage: _uploadProfileImage,
+        refreshProfile: _fetchUserProfile,
       ),
 
-      // 🔹 Gönderiler
-      body:
-      _loading && _posts.isEmpty
+      body: _loading && _posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
         onRefresh: _fetchPosts,
         child: ListView.builder(
           controller: _scrollController,
           itemCount: _posts.length + (_hasMore ? 1 : 0),
-          // Eğer daha fazla varsa loading göstergesi ekle
           itemBuilder: (context, index) {
             if (index >= _posts.length) {
-              // Liste sonuna gelindi -> yükleniyor göstergesi
               if (_isLoadingMore) {
                 return const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Center(child: CircularProgressIndicator()),
                 );
               } else {
-                return const SizedBox.shrink(); // Daha fazla yoksa boş
+                return const SizedBox.shrink();
               }
             }
 
@@ -641,18 +439,17 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   ListTile(
                     leading: CircleAvatar(
-                      backgroundImage:
-                      profile?["avatar_url"] != null
+                      backgroundImage: profile?["avatar_url"] != null
                           ? NetworkImage(profile["avatar_url"])
                           : null,
-                      child:
-                      profile?["avatar_url"] == null
+                      child: profile?["avatar_url"] == null
                           ? const Icon(Icons.person)
                           : null,
                     ),
                     title: Text(profile?["username"] ?? "Anonim"),
                     subtitle: Text(
                       TimeAgo.format(
+                        context,
                         DateTime.parse(post["created_at"]),
                       ),
                       style: const TextStyle(
@@ -675,8 +472,7 @@ class _HomePageState extends State<HomePage> {
                       IconButton(
                         icon: Icon(
                           Icons.arrow_upward,
-                          color:
-                          post["user_vote"] == 1
+                          color: post["user_vote"] == 1
                               ? Colors.green
                               : Colors.grey,
                         ),
@@ -686,8 +482,7 @@ class _HomePageState extends State<HomePage> {
                       IconButton(
                         icon: Icon(
                           Icons.arrow_downward,
-                          color:
-                          post["user_vote"] == -1
+                          color: post["user_vote"] == -1
                               ? Colors.red
                               : Colors.grey,
                         ),
@@ -700,8 +495,7 @@ class _HomePageState extends State<HomePage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder:
-                                  (_) => CommentPage(postId: postId),
+                              builder: (_) => CommentPage(postId: postId),
                             ),
                           );
                         },
@@ -756,15 +550,9 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-
     );
   }
 }
-
-
-
-
-
 
 
 

@@ -161,7 +161,15 @@
   "continue_text": "Devam Et",
   "select_minimum_one_topic": "Devam etmek için en az 1 konu seç",
   "interest_save_error": "İlgi alanları kaydedilemedi",
-  "signup_button": "Kaydol"
+  "signup_button": "Kaydol",
+  "justNow": "Az önce",
+  "minuteAgo": "{count} dakika önce",
+  "hourAgo": "{count} saat önce",
+  "dayAgo": "{count} gün önce",
+  "weekAgo": "{count} hafta önce",
+  "monthAgo": "{count} ay önce",
+  "yearAgo": "{count} yıl önce"
+
 }
 
 
