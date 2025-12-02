@@ -49,11 +49,14 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
         'description': widget.description,
         'banner_url': widget.bannerUrl,
         'icon_url': widget.iconUrl,
-        'topics': widget.selectedTopics,
+        'topics': widget.selectedTopics
+            .map((t) => t.toString().toLowerCase())
+            .toList(), // 🔹 tüm topic’leri küçük harfe çevir
         'type': communityType,
         'is_adult': isAdult,
         'created_by': userId,
       }).select();
+
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),

@@ -13,13 +13,30 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   final user = Supabase.instance.client.auth.currentUser;
 
   bool loading = true;
+
   List<Map<String, dynamic>> recommended = [];
   List<Map<String, dynamic>> allCommunities = [];
-  List<String> categoryList = [];
   List<Map<String, dynamic>> userJoinedCommunities = [];
 
-  String selectedCategory = "All";
   String searchQuery = "";
+
+  // ✅ FOTOĞRAFTAKİ KATEGORİLER (BİREBİR)
+  final List<String> redditCategories = [
+    "Internet Kültürü",
+    "Oyunlar",
+    "Soru-Cevap/Öykü",
+    "Moda ve Güzellik",
+    "Teknoloji",
+    "Film-Televizyon",
+    "Gezilecek Yerler",
+    "Haber/Politika",
+    "Popüler Kültür",
+    "İş Dünyası ve Finans",
+    "Spor",
+    "Eğitim ve Bilim",
+  ];
+
+  String selectedCategory = "Internet Kültürü";
 
   @override
   void initState() {
@@ -37,18 +54,18 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     setState(() => loading = false);
   }
 
+  // ---------- LOAD DATA ----------
+
   Future<void> _loadAllCommunities() async {
     try {
-      final communities = List<Map<String, dynamic>>.from(
-        await supabase.from("communities").select("*").order("created_at", ascending: false),
-      );
-      allCommunities = communities;
-      final types = communities.map((c) => (c["type"] ?? "Other").toString()).toSet().toList();
-      categoryList = ["All", ...types];
+      final result = await supabase
+          .from("communities")
+          .select("*")
+          .order("created_at", ascending: false);
+
+      allCommunities = List<Map<String, dynamic>>.from(result);
     } catch (e) {
-      debugPrint("Load communities error: $e");
       allCommunities = [];
-      categoryList = ["All"];
     }
   }
 
@@ -57,29 +74,30 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       recommended = [];
       return;
     }
-    try {
-      final interests = List<Map<String, dynamic>>.from(
-        await supabase.from("user_interests").select("interest_name").eq("user_id", user!.id),
-      );
 
-      final interestNames = interests.map((i) => i["interest_name"].toString()).toList();
+    try {
+      final interests = await supabase
+          .from("user_interests")
+          .select("interest_name")
+          .eq("user_id", user!.id);
+
+      final interestNames = interests
+          .map((i) => i["interest_name"].toString().toLowerCase())
+          .toList();
 
       if (interestNames.isEmpty) {
         recommended = [];
         return;
       }
 
-      final recs = List<Map<String, dynamic>>.from(
-        await supabase
-            .from("communities")
-            .select("*")
-            .inFilter("type", interestNames)
-            .order("created_at", ascending: false),
-      );
+      final recs = await supabase
+          .from("communities")
+          .select("*")
+          .overlaps("topics", interestNames)
+          .order("created_at", ascending: false);
 
-      recommended = recs;
+      recommended = List<Map<String, dynamic>>.from(recs);
     } catch (e) {
-      debugPrint("Load user interests error: $e");
       recommended = [];
     }
   }
@@ -89,219 +107,313 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       userJoinedCommunities = [];
       return;
     }
-    try {
-      final joins = List<Map<String, dynamic>>.from(
-        await supabase.from("user_communities").select("community_id").eq("user_id", user!.id),
-      );
-      final communityIds = joins.map((j) => j["community_id"]).toList();
 
-      if (communityIds.isEmpty) {
+    try {
+      final joins = await supabase
+          .from("user_communities")
+          .select("community_id")
+          .eq("user_id", user!.id);
+
+      final ids = joins.map((j) => j["community_id"]).toList();
+
+      if (ids.isEmpty) {
         userJoinedCommunities = [];
         return;
       }
 
-      final comms = List<Map<String, dynamic>>.from(
-        await supabase.from("communities").select("*").inFilter("id", communityIds),
-      );
+      final comms = await supabase
+          .from("communities")
+          .select("*")
+          .inFilter("id", ids);
 
-      userJoinedCommunities = comms;
+      userJoinedCommunities = List<Map<String, dynamic>>.from(comms);
     } catch (e) {
-      debugPrint("Load user joined communities error: $e");
       userJoinedCommunities = [];
     }
   }
 
+  // ---------- FILTER ----------
+
   List<Map<String, dynamic>> _filteredCommunities() {
-    final q = searchQuery.trim().toLowerCase();
+    final q = searchQuery.toLowerCase();
+
     return allCommunities.where((c) {
-      if (selectedCategory != "All" && (c["type"] ?? "") != selectedCategory) return false;
       if (q.isEmpty) return true;
+
       final name = (c["name"] ?? "").toString().toLowerCase();
       final desc = (c["description"] ?? "").toString().toLowerCase();
-      final type = (c["type"] ?? "").toString().toLowerCase();
-      return name.contains(q) || desc.contains(q) || type.contains(q);
+
+      return name.contains(q) || desc.contains(q);
     }).toList();
-  }
-
-  Future<void> _joinCommunity(Map<String, dynamic> community) async {
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Giriş yapmalısınız.")));
-      return;
-    }
-
-    final communityId = community["id"];
-
-    try {
-      final existing = await supabase
-          .from("user_communities")
-          .select("id")
-          .eq("user_id", user!.id)
-          .eq("community_id", communityId)
-          .maybeSingle();
-
-      if (existing != null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Zaten katılıyorsun.")));
-        return;
-      }
-
-      await supabase.from("user_communities").insert({
-        "user_id": user!.id,
-        "community_id": communityId,
-        "joined_at": DateTime.now().toIso8601String(),
-      });
-
-      await _loadUserJoinedCommunities();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Topluluğa katıldın ✅")));
-    } catch (e) {
-      debugPrint("Join community error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Katılma başarısız.")));
-    }
   }
 
   bool _isJoined(Map<String, dynamic> community) {
     return userJoinedCommunities.any((c) => c["id"] == community["id"]);
   }
 
-  Widget _communityCard(Map<String, dynamic> community) {
+  // ---------- JOIN ----------
+
+  Future<void> _joinCommunity(Map<String, dynamic> community) async {
+    if (user == null) return;
+
+    final id = community["id"];
+
+    try {
+      await supabase.from("user_communities").insert({
+        "user_id": user!.id,
+        "community_id": id,
+        "joined_at": DateTime.now().toIso8601String(),
+      });
+
+      await _loadUserJoinedCommunities();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Topluluğa katıldın ✅")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Bir hata oluştu")),
+      );
+    }
+  }
+
+  // ✅ REDDIT TARZI KATEGORİ BAR
+  Widget _redditStyleCategoryBar() {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: redditCategories.map((cat) {
+        final selected = selectedCategory == cat;
+
+        return GestureDetector(
+          onTap: () => setState(() => selectedCategory = cat),
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 12,
+            ),
+            decoration: BoxDecoration(
+              color: selected ? Colors.black : Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: Colors.grey.shade300, width: 1.2),
+            ),
+            child: Text(
+              cat,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.black,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _recommendedCard(Map<String, dynamic> community) {
     final joined = _isJoined(community);
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundImage: community["avatar_url"] != null ? NetworkImage(community["avatar_url"]) : null,
-          child: community["avatar_url"] == null ? const Icon(Icons.group) : null,
-        ),
-        title: Text(community["name"] ?? "Topluluk"),
-        subtitle: Text(community["description"] ?? (community["type"] ?? "")),
-        trailing: ElevatedButton(
-          onPressed: joined ? null : () => _joinCommunity(community),
-          child: Text(joined ? "Katıldın" : "Katıl"),
-        ),
-        onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Topluluk: ${community["name"]}")),
-          );
-        },
+
+    return Container(
+      width: 300,
+      margin: const EdgeInsets.only(right: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                backgroundImage: community["avatar_url"] != null
+                    ? NetworkImage(community["avatar_url"])
+                    : null,
+                child: community["avatar_url"] == null
+                    ? const Icon(Icons.group)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  community["name"] ?? "",
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            community["description"] ?? "",
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: joined ? null : () => _joinCommunity(community),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade200,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+              ),
+              child: Text(joined ? "Katıldın" : "Katıl"),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _communityTileCompact(Map<String, dynamic> community) {
+  Widget _communityCard(Map<String, dynamic> community) {
     final joined = _isJoined(community);
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-      leading: CircleAvatar(
-        backgroundImage: community["avatar_url"] != null ? NetworkImage(community["avatar_url"]) : null,
-        child: community["avatar_url"] == null ? const Icon(Icons.group) : null,
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.grey.shade300),
       ),
-      title: Text(community["name"] ?? "Topluluk"),
-      subtitle: Text(community["description"] ?? (community["type"] ?? "")),
-      trailing: ElevatedButton(
-        onPressed: joined ? null : () => _joinCommunity(community),
-        child: Text(joined ? "Katıldın" : "Katıl"),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 22,
+            backgroundImage: community["avatar_url"] != null
+                ? NetworkImage(community["avatar_url"])
+                : null,
+            child:
+            community["avatar_url"] == null ? const Icon(Icons.group) : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  community["name"] ?? "",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  community["description"] ?? "",
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: joined ? null : () => _joinCommunity(community),
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+              joined ? Colors.grey.shade300 : Colors.grey.shade200,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+            ),
+            child: Text(joined ? "Katıldın" : "Katıl"),
+          ),
+        ],
       ),
-      onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Topluluk: ${community["name"]}")),
-        );
-      },
     );
   }
+
+  // ---------- BUILD ----------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+
       appBar: AppBar(
-        title: const Text("Toplulukları Keşfet"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadAllData,
+        elevation: 0,
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        leading: const Icon(Icons.menu),
+        title: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(25),
           ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Topluluk oluşturma")),
-              );
-            },
+          child: TextField(
+            onChanged: (v) => setState(() {
+              searchQuery = v;
+            }),
+            decoration: const InputDecoration(
+              hintText: "Topluluk ara",
+              border: InputBorder.none,
+              icon: Icon(Icons.search),
+            ),
           ),
+        ),
+        actions: const [
+          SizedBox(width: 10),
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: Colors.blueGrey,
+            child: Icon(Icons.person, color: Colors.white, size: 18),
+          ),
+          SizedBox(width: 14),
         ],
       ),
+
       body: loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: ListView(
           children: [
-            TextField(
-              decoration: const InputDecoration(
-                hintText: "Topluluk ara",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-              ),
-              onChanged: (v) {
-                setState(() => searchQuery = v);
-              },
+            const Text(
+              "Konuya göre toplulukları keşfet",
+              style:
+              TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
 
-            // Categories
-            SizedBox(
-              height: 42,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: categoryList.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, idx) {
-                  final cat = categoryList[idx];
-                  final selected = selectedCategory == cat;
-                  return ChoiceChip(
-                    label: Text(cat),
-                    selected: selected,
-                    onSelected: (_) => setState(() => selectedCategory = cat),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
+
+            _redditStyleCategoryBar(),
+
+            const SizedBox(height: 24),
 
             const Text("Senin için önerilen",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
 
-            if (recommended.isEmpty)
-              const Text("Kişisel öneri bulunamadı. İlgi alanlarını ekleyin veya farklı kategorileri keşfedin.")
-            else
-              Column(
-                children: recommended.map((c) => _communityTileCompact(c)).toList(),
+            const SizedBox(height: 10),
+
+            SizedBox(
+              height: 180,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: recommended.map(_recommendedCard).toList(),
               ),
+            ),
 
-            const SizedBox(height: 20),
-
-            const Text("Katıldığın topluluklar",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            if (userJoinedCommunities.isEmpty)
-              const Text("Henüz hiçbir topluluğa katılmadın.")
-            else
-              Column(
-                children: userJoinedCommunities.map((c) => _communityCard(c)).toList(),
-              ),
-
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
             const Text("Tüm topluluklar",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold)),
 
-            ..._filteredCommunities().map((c) => _communityCard(c)).toList(),
+            const SizedBox(height: 10),
+
+            ..._filteredCommunities().map(_communityCard).toList(),
           ],
         ),
       ),
     );
   }
 }
+
+
+
