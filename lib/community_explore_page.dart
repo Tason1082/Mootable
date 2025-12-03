@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'community/topic_data.dart'; // getTopicsData fonksiyonunu import et
 
 class CommunityExplorePage extends StatefulWidget {
   const CommunityExplorePage({super.key});
@@ -20,23 +22,11 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
 
   String searchQuery = "";
 
-  // ✅ FOTOĞRAFTAKİ KATEGORİLER (BİREBİR)
-  final List<String> redditCategories = [
-    "Internet Kültürü",
-    "Oyunlar",
-    "Soru-Cevap/Öykü",
-    "Moda ve Güzellik",
-    "Teknoloji",
-    "Film-Televizyon",
-    "Gezilecek Yerler",
-    "Haber/Politika",
-    "Popüler Kültür",
-    "İş Dünyası ve Finans",
-    "Spor",
-    "Eğitim ve Bilim",
-  ];
+  late AppLocalizations l10n;
 
-  String selectedCategory = "Internet Kültürü";
+  List<String> redditCategories = [];
+  String selectedCategory = "";
+  String? selectedTopic; // 🔹 Seçilen alt konu
 
   @override
   void initState() {
@@ -53,8 +43,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     ]);
     setState(() => loading = false);
   }
-
-  // ---------- LOAD DATA ----------
 
   Future<void> _loadAllCommunities() async {
     try {
@@ -121,10 +109,8 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         return;
       }
 
-      final comms = await supabase
-          .from("communities")
-          .select("*")
-          .inFilter("id", ids);
+      final comms =
+      await supabase.from("communities").select("*").inFilter("id", ids);
 
       userJoinedCommunities = List<Map<String, dynamic>>.from(comms);
     } catch (e) {
@@ -132,12 +118,25 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     }
   }
 
-  // ---------- FILTER ----------
-
+  // 🔹 Filtreleme: selectedCategory ve selectedTopic küçük harfe göre
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
+    final topicsData = getTopicsData(l10n);
+    final currentTopics =
+        topicsData[selectedCategory]?.map((t) => t.toLowerCase()).toList() ?? [];
 
     return allCommunities.where((c) {
+      final communityTopics =
+      List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
+
+      // 🔹 selectedTopic varsa ona göre filtrele
+      if (selectedTopic != null &&
+          !communityTopics.contains(selectedTopic!.toLowerCase())) return false;
+
+      // 🔹 selectedTopic yoksa kategori alt konularına göre filtrele
+      if (selectedTopic == null &&
+          !communityTopics.any((t) => currentTopics.contains(t))) return false;
+
       if (q.isEmpty) return true;
 
       final name = (c["name"] ?? "").toString().toLowerCase();
@@ -150,8 +149,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   bool _isJoined(Map<String, dynamic> community) {
     return userJoinedCommunities.any((c) => c["id"] == community["id"]);
   }
-
-  // ---------- JOIN ----------
 
   Future<void> _joinCommunity(Map<String, dynamic> community) async {
     if (user == null) return;
@@ -177,37 +174,76 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     }
   }
 
-  // ✅ REDDIT TARZI KATEGORİ BAR
+  // 🔹 Scrollable kategori barı
   Widget _redditStyleCategoryBar() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: redditCategories.map((cat) {
-        final selected = selectedCategory == cat;
+    return SizedBox(
+      height: 50,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: redditCategories.map((cat) {
+            final selected = selectedCategory == cat;
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => setState(() {
+                  selectedCategory = cat;
+                  selectedTopic = null; // kategori değişince alt konuyu resetle
+                }),
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.black : Colors.white,
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.grey.shade300, width: 1.2),
+                  ),
+                  child: Text(
+                    cat,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? Colors.white : Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
 
-        return GestureDetector(
-          onTap: () => setState(() => selectedCategory = cat),
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color: selected ? Colors.black : Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.grey.shade300, width: 1.2),
-            ),
-            child: Text(
-              cat,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : Colors.black,
+  // 🔹 Alt konular yatay scroll, tıklanabilir ve seçiliyi işaretli
+  Widget _buildTopicsBar() {
+    final currentTopics = getTopicsData(l10n)[selectedCategory] ?? [];
+
+    return SizedBox(
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: currentTopics.length,
+        itemBuilder: (context, index) {
+          final topic = currentTopics[index];
+          final isSelected = selectedTopic?.toLowerCase() == topic.toLowerCase();
+
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: GestureDetector(
+              onTap: () => setState(() {
+                selectedTopic = isSelected ? null : topic; // seçiliyi toggle et
+              }),
+              child: Chip(
+                label: Text(topic),
+                backgroundColor: isSelected ? Colors.black : Colors.grey.shade200,
+                labelStyle:
+                TextStyle(color: isSelected ? Colors.white : Colors.black),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        },
+      ),
     );
   }
 
@@ -239,8 +275,8 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
               Expanded(
                 child: Text(
                   community["name"] ?? "",
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
+                  style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ],
@@ -326,13 +362,16 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-  // ---------- BUILD ----------
-
   @override
   Widget build(BuildContext context) {
+    l10n = AppLocalizations.of(context)!;
+    redditCategories = getTopicsData(l10n).keys.toList();
+    if (selectedCategory.isEmpty && redditCategories.isNotEmpty) {
+      selectedCategory = redditCategories.first;
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
-
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
@@ -366,7 +405,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           SizedBox(width: 14),
         ],
       ),
-
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : Padding(
@@ -378,19 +416,23 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
               style:
               TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-
             const SizedBox(height: 14),
 
-            _redditStyleCategoryBar(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _redditStyleCategoryBar(),
+                const SizedBox(height: 10),
+                _buildTopicsBar(), // 🔹 tıklanabilir alt konular
+              ],
+            ),
 
             const SizedBox(height: 24),
-
             const Text("Senin için önerilen",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
 
             const SizedBox(height: 10),
-
             SizedBox(
               height: 180,
               child: ListView(
@@ -400,13 +442,11 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
             ),
 
             const SizedBox(height: 25),
-
             const Text("Tüm topluluklar",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+                style:
+                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
 
             const SizedBox(height: 10),
-
             ..._filteredCommunities().map(_communityCard).toList(),
           ],
         ),
@@ -414,6 +454,4 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 }
-
-
 

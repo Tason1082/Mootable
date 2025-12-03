@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mootable/settings_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'edit_profile_page.dart';
-import 'login_page.dart';
-import 'saved_posts_page.dart';
+import '../edit_profile_page.dart';
+import '../login_page.dart';
+import '../saved_posts_page.dart';
 
 class RightProfileDrawer extends StatelessWidget {
   final String? profileImageUrl;

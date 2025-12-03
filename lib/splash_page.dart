@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
-import 'home_page.dart';
+import 'home/home_page.dart';
 import 'InterestSelectionPage.dart';
 
 class SplashPage extends StatefulWidget {

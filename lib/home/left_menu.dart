@@ -1,6 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'community/CreateCommunityPage.dart';
+import '../community/CreateCommunityPage.dart';
 
 void openLeftSideSheet(BuildContext context) {
   showGeneralDialog(

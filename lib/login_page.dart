@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'signup_page.dart';
 import 'error_handler.dart';
 import 'InterestSelectionPage.dart';
-import 'home_page.dart';
+import 'home/home_page.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class LoginPage extends StatefulWidget {
@@ -71,7 +71,7 @@ class _LoginPageState extends State<LoginPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image.asset(
-                'assets/logo.jpeg',
+                'assets/logoTansparent.png',
                 height: 100,
               ),
               const SizedBox(height: 40),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../home_page.dart';
+import '../home/home_page.dart';
 
 class CommunityTypePage extends StatefulWidget {
   final String name;

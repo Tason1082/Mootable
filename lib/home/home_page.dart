@@ -1,63 +1,64 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-import 'community_explore_page.dart';
-import 'login_page.dart';
-import 'comment_page.dart';
-import 'post_page.dart';
-import 'user_posts_page.dart';
-import 'saved_posts_page.dart';
-import 'TimeAgo.dart';
+import '../community_explore_page.dart';
+import '../login_page.dart';
+import '../comment_page.dart';
+import '../post_page.dart';
+import '../user_posts_page.dart';
+import '../saved_posts_page.dart';
+import '../TimeAgo.dart';
 import 'dart:typed_data' as typed_data;
 import 'package:video_thumbnail/video_thumbnail.dart';
-import 'video_player_widget.dart';
-import 'community/CreateCommunityPage.dart';
+import '../video_player_widget.dart';
+import '../community/CreateCommunityPage.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'edit_profile_page.dart';
-import 'settings_page.dart';
+import '../edit_profile_page.dart';
+import '../settings_page.dart';
 
 // YENİ MENÜ DOSYALARI
 import 'left_menu.dart';
 import 'right_profile_drawer.dart';
 
-// 🔹 Ana Sayfa
+// 🔹 Fonksiyonları import ediyoruz
+import 'home_page_functions.dart';
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
-  List<Map<String, dynamic>> _posts = [];
-  bool _loading = true;
+class HomePageState extends State<HomePage> {
+  List<Map<String, dynamic>> posts = [];
+  bool loading = true;
   final user = Supabase.instance.client.auth.currentUser;
   String? username;
   String? bio;
   String? profileImageUrl;
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedIndex = 0;
+  final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  int selectedIndex = 0;
 
   // Sayfalama
-  int _limit = 5;
-  int _offset = 0;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
+  int limit = 5;
+  int offset = 0;
+  bool isLoadingMore = false;
+  bool hasMore = true;
   late ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    _fetchPosts();
+    fetchPosts(this); // 🔹 Fonksiyon dosyasından çağırıyoruz
     _scrollController = ScrollController();
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
-        _fetchPosts(loadMore: true);
+        fetchPosts(this, loadMore: true);
       }
     });
     _fetchUserProfile();
@@ -118,213 +119,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _fetchPosts({bool loadMore = false}) async {
-    if (_isLoadingMore || (!_hasMore && loadMore)) return;
-
-    if (!loadMore) setState(() => _loading = true);
-    setState(() => _isLoadingMore = true);
-
-    final List<Map<String, dynamic>> posts = List<Map<String, dynamic>>.from(
-      await Supabase.instance.client
-          .from("posts")
-          .select("id, content, image_url, created_at, user_id")
-          .order("created_at", ascending: false)
-          .range(_offset, _offset + _limit - 1),
-    );
-
-    if (posts.isEmpty) {
-      setState(() {
-        _hasMore = false;
-        _isLoadingMore = false;
-        _loading = false;
-      });
-      return;
-    }
-
-    List<Map<String, dynamic>> postsWithExtras = [];
-    for (var post in posts) {
-      final profileMap = await Supabase.instance.client
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", post["user_id"])
-          .maybeSingle();
-
-      final votesList = List<Map<String, dynamic>>.from(
-        await Supabase.instance.client
-            .from("votes")
-            .select("user_id, vote")
-            .eq("post_id", post["id"]),
-      );
-
-      final commentsList = List<Map<String, dynamic>>.from(
-        await Supabase.instance.client
-            .from("comments")
-            .select("id")
-            .eq("post_id", post["id"]),
-      );
-
-      final savedMap = await Supabase.instance.client
-          .from("saves")
-          .select("id")
-          .eq("post_id", post["id"])
-          .eq("user_id", user!.id)
-          .maybeSingle();
-
-      final upvotes = votesList.where((v) => v["vote"] == 1).length;
-      final downvotes = votesList.where((v) => v["vote"] == -1).length;
-      final userVote =
-          votesList.firstWhere(
-                (v) => v["user_id"] == user?.id,
-            orElse: () => {"vote": 0},
-          )["vote"] ??
-              0;
-
-      postsWithExtras.add({
-        ...post,
-        "profiles": profileMap,
-        "votes_count": upvotes - downvotes,
-        "user_vote": userVote,
-        "comment_count": commentsList.length,
-        "is_saved": savedMap != null,
-      });
-    }
-
-    setState(() {
-      if (loadMore) {
-        _posts.addAll(postsWithExtras);
-      } else {
-        _posts = postsWithExtras;
-      }
-
-      _offset += _limit;
-      _isLoadingMore = false;
-      _loading = false;
-      _hasMore = posts.length == _limit;
-    });
-  }
-
-  Future<void> _toggleVote(int postId, int vote) async {
-    final userId = user?.id;
-    if (userId == null) return;
-
-    final index = _posts.indexWhere((p) => p["id"] == postId);
-    if (index == -1) return;
-
-    final post = _posts[index];
-    final int previousVote = post["user_vote"] ?? 0;
-    final int previousCount = post["votes_count"] ?? 0;
-
-    setState(() {
-      if (previousVote == vote) {
-        post["user_vote"] = 0;
-        post["votes_count"] = previousCount - vote;
-      } else {
-        post["user_vote"] = vote;
-        post["votes_count"] = previousCount - previousVote + vote;
-      }
-    });
-
-    try {
-      final existingVote = await Supabase.instance.client
-          .from("votes")
-          .select("vote")
-          .eq("post_id", postId)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-      if (existingVote != null) {
-        if (existingVote["vote"] == vote) {
-          await Supabase.instance.client
-              .from("votes")
-              .delete()
-              .eq("post_id", postId)
-              .eq("user_id", userId);
-        } else {
-          await Supabase.instance.client
-              .from("votes")
-              .update({"vote": vote})
-              .eq("post_id", postId)
-              .eq("user_id", userId);
-        }
-      } else {
-        await Supabase.instance.client.from("votes").insert({
-          "post_id": postId,
-          "user_id": userId,
-          "vote": vote,
-        });
-      }
-    } catch (e) {
-      setState(() {
-        post["user_vote"] = previousVote;
-        post["votes_count"] = previousCount;
-      });
-      print("Vote error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Oylama başarısız oldu!")),
-      );
-    }
-  }
-
-  Future<void> _toggleSave(int postId, bool currentlySaved) async {
-    final userId = user?.id;
-    if (userId == null) return;
-
-    final index = _posts.indexWhere((p) => p["id"] == postId);
-    if (index == -1) return;
-
-    setState(() {
-      _posts[index]["is_saved"] = !currentlySaved;
-    });
-
-    try {
-      if (currentlySaved) {
-        await Supabase.instance.client
-            .from("saves")
-            .delete()
-            .eq("post_id", postId)
-            .eq("user_id", userId);
-      } else {
-        await Supabase.instance.client.from("saves").insert({
-          "post_id": postId,
-          "user_id": userId,
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _posts[index]["is_saved"] = currentlySaved;
-      });
-      print("Save error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Kaydetme işlemi başarısız oldu!")),
-      );
-    }
-  }
-
-  void _onItemTapped(int index) {
-    if (index == 1) {
-      // Topluluk sayfasına git
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const CommunityExplorePage()),
-      );
-    }
-    if (index == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PostAddPage()),
-      ).then((value) {
-        if (value == true) {
-          _offset = 0;
-          _posts.clear();
-          _hasMore = true;
-          _fetchPosts();
-        }
-      });
-    } else {
-      setState(() => _selectedIndex = index);
-    }
-  }
-
   Widget _buildMediaWidget(String url) {
     final lowerUrl = url.toLowerCase();
 
@@ -359,25 +153,23 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
+      key: scaffoldKey,
 
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () => openLeftSideSheet(context), // YENİ
+          onPressed: () => openLeftSideSheet(context),
         ),
-
         title: Image.asset(
-          'assets/logo.jpeg',
+          'assets/logoTansparent.png',
           height: 40,
         ),
         centerTitle: true,
-
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12.0),
             child: GestureDetector(
-              onTap: () => _scaffoldKey.currentState?.openEndDrawer(),
+              onTap: () => scaffoldKey.currentState?.openEndDrawer(),
               child: CircleAvatar(
                 radius: 18,
                 backgroundImage: profileImageUrl != null
@@ -392,7 +184,6 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
-      // 👉 Sağdaki Profil Menüsü Artık Ayrı Dosyada
       endDrawer: RightProfileDrawer(
         profileImageUrl: profileImageUrl,
         username: username,
@@ -401,16 +192,16 @@ class _HomePageState extends State<HomePage> {
         refreshProfile: _fetchUserProfile,
       ),
 
-      body: _loading && _posts.isEmpty
+      body: loading && posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-        onRefresh: _fetchPosts,
+        onRefresh: () => fetchPosts(this),
         child: ListView.builder(
           controller: _scrollController,
-          itemCount: _posts.length + (_hasMore ? 1 : 0),
+          itemCount: posts.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
-            if (index >= _posts.length) {
-              if (_isLoadingMore) {
+            if (index >= posts.length) {
+              if (isLoadingMore) {
                 return const Padding(
                   padding: EdgeInsets.all(16.0),
                   child: Center(child: CircularProgressIndicator()),
@@ -420,16 +211,13 @@ class _HomePageState extends State<HomePage> {
               }
             }
 
-            final post = _posts[index];
+            final post = posts[index];
             final profile = post["profiles"];
             final postId = post["id"];
             final isSaved = post["is_saved"] == true;
 
             return Card(
-              margin: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -476,7 +264,7 @@ class _HomePageState extends State<HomePage> {
                               ? Colors.green
                               : Colors.grey,
                         ),
-                        onPressed: () => _toggleVote(postId, 1),
+                        onPressed: () => toggleVote(this, postId, 1),
                       ),
                       Text("${post["votes_count"] ?? 0}"),
                       IconButton(
@@ -486,7 +274,7 @@ class _HomePageState extends State<HomePage> {
                               ? Colors.red
                               : Colors.grey,
                         ),
-                        onPressed: () => _toggleVote(postId, -1),
+                        onPressed: () => toggleVote(this, postId, -1),
                       ),
                       const SizedBox(width: 10),
                       IconButton(
@@ -504,12 +292,10 @@ class _HomePageState extends State<HomePage> {
                       const Spacer(),
                       IconButton(
                         icon: Icon(
-                          isSaved
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
+                          isSaved ? Icons.bookmark : Icons.bookmark_border,
                           color: isSaved ? Colors.blue : Colors.grey,
                         ),
-                        onPressed: () => _toggleSave(postId, isSaved),
+                        onPressed: () => toggleSave(this, postId, isSaved),
                       ),
                     ],
                   ),
@@ -521,8 +307,8 @@ class _HomePageState extends State<HomePage> {
       ),
 
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        currentIndex: selectedIndex,
+        onTap: (index) => onItemTapped(this, index),
         selectedItemColor: Colors.black87,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
@@ -553,6 +339,4 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
-
 
