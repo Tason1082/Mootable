@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'comment_reply_page.dart';
 
 class CommentPage extends StatefulWidget {
   final int postId;
@@ -11,8 +10,9 @@ class CommentPage extends StatefulWidget {
 }
 
 class _CommentPageState extends State<CommentPage> {
+  List<Map<String, dynamic>> comments = [];
+  Map<int?, List<Map<String, dynamic>>> tree = {};
   final _text = TextEditingController();
-  List<Map<String, dynamic>> _comments = [];
 
   @override
   void initState() {
@@ -27,14 +27,24 @@ class _CommentPageState extends State<CommentPage> {
           id,
           content,
           created_at,
-          profiles(username, id),
-          comment_votes(vote, user_id),
-          comment_replies(id)
+          comment_edited,
+          parent_id,
+          profiles(id, username),
+          comment_votes(vote, user_id)
         ''')
         .eq("post_id", widget.postId)
-        .order("created_at", ascending: false);
+        .order("created_at", ascending: true);
 
-    setState(() => _comments = List<Map<String, dynamic>>.from(data));
+    comments = List<Map<String, dynamic>>.from(data);
+
+    tree = {};
+    for (var c in comments) {
+      final pid = c["parent_id"];
+      tree.putIfAbsent(pid, () => []);
+      tree[pid]!.add(c);
+    }
+
+    setState(() {});
   }
 
   Future<void> _addComment() async {
@@ -45,9 +55,24 @@ class _CommentPageState extends State<CommentPage> {
       "post_id": widget.postId,
       "user_id": user.id,
       "content": _text.text.trim(),
+      "parent_id": null,
     });
 
     _text.clear();
+    _fetchComments();
+  }
+
+  Future<void> _addReply(int parentId, String content) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null || content.trim().isEmpty) return;
+
+    await Supabase.instance.client.from("comments").insert({
+      "post_id": widget.postId,
+      "user_id": user.id,
+      "content": content.trim(),
+      "parent_id": parentId,
+    });
+
     _fetchComments();
   }
 
@@ -70,7 +95,6 @@ class _CommentPageState extends State<CommentPage> {
       });
     } else {
       final oldVote = existing[0]["vote"];
-
       if (oldVote == vote) {
         await client
             .from("comment_votes")
@@ -89,183 +113,162 @@ class _CommentPageState extends State<CommentPage> {
     _fetchComments();
   }
 
-  void _showReplyDialog(int commentId) {
+  void _showReplyDialog(int parentId) {
     TextEditingController replyText = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Cevap yaz"),
+      builder: (_) => AlertDialog(
+        title: const Text("Yanıtla"),
         content: TextField(controller: replyText),
         actions: [
           TextButton(
             onPressed: () async {
-              final user = Supabase.instance.client.auth.currentUser;
-
-              if (user != null && replyText.text.trim().isNotEmpty) {
-                await Supabase.instance.client
-                    .from("comment_replies")
-                    .insert({
-                  "parent_id": commentId,
-                  "user_id": user.id,
-                  "content": replyText.text.trim(),
-                });
-              }
-
+              await _addReply(parentId, replyText.text);
               Navigator.pop(context);
-              _fetchComments();
             },
             child: const Text("Gönder"),
-          ),
+          )
         ],
       ),
     );
   }
 
-  void _openReplyList(int commentId) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CommentReplyPage(commentId: commentId),
+  void _showEditDialog(int commentId, String oldContent) {
+    final editor = TextEditingController(text: oldContent);
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Düzenle"),
+        content: TextField(
+          controller: editor,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final newText = editor.text.trim();
+              if (newText.isNotEmpty) {
+                await Supabase.instance.client
+                    .from("comments")
+                    .update({
+                  "content": newText,
+                  "comment_edited": DateTime.now().toIso8601String()
+                })
+                    .eq("id", commentId);
+                _fetchComments();
+              }
+              Navigator.pop(context);
+            },
+            child: const Text("Kaydet"),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComment(Map<String, dynamic> c, int depth) {
+    final currentUser = Supabase.instance.client.auth.currentUser?.id;
+
+    final votes = (c["comment_votes"] as List?) ?? [];
+    int score = 0;
+    int userVote = 0;
+
+    for (var v in votes) {
+      score += (v["vote"] as num).toInt();
+      if (v["user_id"] == currentUser) userVote = v["vote"];
+    }
+
+    final children = tree[c["id"]] ?? [];
+
+    return Padding(
+      padding: EdgeInsets.only(left: depth * 20.0, top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            c["profiles"]["username"],
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+
+          const SizedBox(height: 4),
+          Text(c["content"]),
+
+          if (c["edited_at"] != null)
+            const Text("(düzenlendi)",
+                style: TextStyle(fontSize: 11, color: Colors.grey)),
+
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.arrow_upward,
+                    color: userVote == 1 ? Colors.orange : Colors.grey),
+                onPressed: () => _voteComment(c["id"], 1),
+              ),
+              Text(score.toString()),
+              IconButton(
+                icon: Icon(Icons.arrow_downward,
+                    color: userVote == -1 ? Colors.blue : Colors.grey),
+                onPressed: () => _voteComment(c["id"], -1),
+              ),
+
+              TextButton(
+                onPressed: () => _showReplyDialog(c["id"]),
+                child: const Text("Yanıtla"),
+              ),
+
+              if (c["profiles"]["id"] == currentUser)
+                TextButton(
+                  onPressed: () =>
+                      _showEditDialog(c["id"], c["content"]),
+                  child: const Text("Düzenle"),
+                ),
+            ],
+          ),
+
+          // Recursive child comments
+          for (var reply in children) _buildComment(reply, depth + 1),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final roots = tree[null] ?? [];
+
     return Scaffold(
       appBar: AppBar(title: const Text("Yorumlar")),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              itemCount: _comments.length,
-              itemBuilder: (context, i) {
-                final c = _comments[i];
-                final username = c['profiles']?['username'] ?? 'Anonim';
-                final content = c['content'];
-
-                final votes = c['comment_votes'] as List;
-                int score = 0;
-                int userVote = 0;
-
-                final userId =
-                    Supabase.instance.client.auth.currentUser?.id;
-
-                for (var v in votes) {
-                  score += (v['vote'] as num).toInt();
-                  if (v['user_id'] == userId) {
-                    userVote = (v['vote'] as num).toInt();
-                  }
-                }
-
-
-                final replies = c['comment_replies'].length;
-
-                return Card(
-                  margin: const EdgeInsets.all(8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Kullanıcı adı + içerik
-                        Text(
-                          username,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(content),
-                        const SizedBox(height: 12),
-
-                        // -------- REDDIT STYLE ACTION BAR --------
-                        Row(
-                          children: [
-                            // UPVOTE
-                            IconButton(
-                              icon: Icon(Icons.arrow_upward,
-                                  color: userVote == 1 ? Colors.orange : Colors.grey),
-                              onPressed: () => _voteComment(c['id'], 1),
-                            ),
-
-                            // SCORE
-                            Text(
-                              score.toString(),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-
-                            // DOWNVOTE
-                            IconButton(
-                              icon: Icon(Icons.arrow_downward,
-                                  color: userVote == -1 ? Colors.blue : Colors.grey),
-                              onPressed: () => _voteComment(c['id'], -1),
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            // SAVE (Kaydet)
-                            IconButton(
-                              icon: Icon(Icons.bookmark_border),
-                              onPressed: () {
-                                // Kaydetme kodu buraya
-                              },
-                            ),
-
-                            const SizedBox(width: 6),
-
-                            // YORUM YAPMA (Cevap)
-                            IconButton(
-                              icon: const Icon(Icons.mode_comment_outlined),
-                              onPressed: () => _showReplyDialog(c['id']),
-                            ),
-
-                            const Spacer(),
-
-                            // Cevap sayısı
-                            if (replies > 0)
-                              InkWell(
-                                onTap: () => _openReplyList(c['id']),
-                                child: Text(
-                                  "$replies cevap →",
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.blue.shade700,
-                                      fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-
-              },
+            child: ListView(
+              children: [
+                for (var c in roots) _buildComment(c, 0),
+              ],
             ),
           ),
 
+          // Add new comment
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(10),
             child: Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _text,
-                    decoration: const InputDecoration(
-                      hintText: "Yorum yaz...",
-                    ),
+                    decoration:
+                    const InputDecoration(hintText: "Yorum yaz..."),
                   ),
                 ),
                 IconButton(
-                  onPressed: _addComment,
                   icon: const Icon(Icons.send),
-                ),
+                  onPressed: _addComment,
+                )
               ],
             ),
-          ),
+          )
         ],
       ),
     );

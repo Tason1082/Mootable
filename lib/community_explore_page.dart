@@ -454,4 +454,3 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 }
-
