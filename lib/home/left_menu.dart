@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../community/CreateCommunityPage.dart';
+import '../my_community/my_community_page.dart';
 
 void openLeftSideSheet(BuildContext context) {
   showGeneralDialog(
@@ -13,8 +14,15 @@ void openLeftSideSheet(BuildContext context) {
       return const _LeftMenuContent();
     },
     transitionBuilder: (context, animation, secondary, child) {
-      final slide = Tween(begin: const Offset(-1, 0), end: Offset.zero)
-          .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutQuad));
+      final slide = Tween(
+        begin: const Offset(-1, 0),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutQuad,
+        ),
+      );
 
       final fade = Tween(begin: 0.0, end: 1.0).animate(animation);
 
@@ -40,7 +48,9 @@ class _LeftMenuContent extends StatelessWidget {
             Positioned.fill(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Container(color: Colors.black.withOpacity(0.2)),
+                child: Container(
+                  color: Colors.black.withOpacity(0.2),
+                ),
               ),
             ),
             Align(
@@ -49,7 +59,10 @@ class _LeftMenuContent extends StatelessWidget {
                 width: MediaQuery.of(context).size.width * 0.8,
                 height: double.infinity,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withOpacity(0.65),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surface
+                      .withOpacity(0.65),
                   borderRadius: const BorderRadius.only(
                     topRight: Radius.circular(28),
                     bottomRight: Radius.circular(28),
@@ -71,7 +84,7 @@ class _LeftMenuContent extends StatelessWidget {
 
                         const SizedBox(height: 30),
 
-                        // SADECE → TOPLULUK OLUŞTUR
+                        // TOPLULUK OLUŞTUR
                         _menuButton(
                           icon: Icons.group_add_outlined,
                           title: "Topluluk Oluştur",
@@ -80,7 +93,25 @@ class _LeftMenuContent extends StatelessWidget {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => const CreateCommunityPage()),
+                                builder: (_) =>
+                                const CreateCommunityPage(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        // TOPLULUKLARIM
+                        _menuButton(
+                          icon: Icons.groups_outlined,
+                          title: "Topluluklarım",
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                const MyCommunityPage(),
+                              ),
                             );
                           },
                         ),
@@ -109,7 +140,10 @@ class _LeftMenuContent extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+            padding: const EdgeInsets.symmetric(
+              vertical: 14,
+              horizontal: 14,
+            ),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.25),
               borderRadius: BorderRadius.circular(16),
@@ -119,7 +153,11 @@ class _LeftMenuContent extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon, size: 26, color: color ?? Colors.white),
+                Icon(
+                  icon,
+                  size: 26,
+                  color: color ?? Colors.white,
+                ),
                 const SizedBox(width: 14),
                 Text(
                   title,
@@ -128,7 +166,7 @@ class _LeftMenuContent extends StatelessWidget {
                     color: color ?? Colors.white,
                     fontWeight: FontWeight.w600,
                   ),
-                )
+                ),
               ],
             ),
           ),

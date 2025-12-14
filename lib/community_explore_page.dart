@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'community/topic_data.dart'; // getTopicsData fonksiyonunu import et
+import 'community/topic_data.dart';
 
 class CommunityExplorePage extends StatefulWidget {
   const CommunityExplorePage({super.key});
@@ -26,7 +26,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
 
   List<String> redditCategories = [];
   String selectedCategory = "";
-  String? selectedTopic; // 🔹 Seçilen alt konu
+  String? selectedTopic;
 
   @override
   void initState() {
@@ -118,104 +118,97 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     }
   }
 
-  // 🔹 Filtreleme: selectedCategory ve selectedTopic küçük harfe göre
+  bool _isJoined(Map<String, dynamic> community) {
+    return userJoinedCommunities.any((c) => c["id"] == community["id"]);
+  }
+
+  List<Map<String, dynamic>> get filteredRecommended {
+    final joinedIds = userJoinedCommunities.map((c) => c["id"]).toList();
+    return recommended.where((c) => !joinedIds.contains(c["id"])).toList();
+  }
+
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
-    final topicsData = getTopicsData(l10n);
     final currentTopics =
-        topicsData[selectedCategory]?.map((t) => t.toLowerCase()).toList() ?? [];
+        getTopicsData(l10n)[selectedCategory]?.map((t) => t.toLowerCase()).toList() ??
+            [];
 
     return allCommunities.where((c) {
-      final communityTopics =
+      final topics =
       List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
 
-      // 🔹 selectedTopic varsa ona göre filtrele
       if (selectedTopic != null &&
-          !communityTopics.contains(selectedTopic!.toLowerCase())) return false;
+          !topics.contains(selectedTopic!.toLowerCase())) return false;
 
-      // 🔹 selectedTopic yoksa kategori alt konularına göre filtrele
       if (selectedTopic == null &&
-          !communityTopics.any((t) => currentTopics.contains(t))) return false;
-
-      if (q.isEmpty) return true;
+          !topics.any((t) => currentTopics.contains(t))) return false;
 
       final name = (c["name"] ?? "").toString().toLowerCase();
       final desc = (c["description"] ?? "").toString().toLowerCase();
 
-      return name.contains(q) || desc.contains(q);
+      return name.contains(q) || desc.contains(q) || q.isEmpty;
     }).toList();
-  }
-
-  bool _isJoined(Map<String, dynamic> community) {
-    return userJoinedCommunities.any((c) => c["id"] == community["id"]);
   }
 
   Future<void> _joinCommunity(Map<String, dynamic> community) async {
     if (user == null) return;
 
-    final id = community["id"];
-
     try {
       await supabase.from("user_communities").insert({
         "user_id": user!.id,
-        "community_id": id,
+        "community_id": community["id"],
         "joined_at": DateTime.now().toIso8601String(),
       });
 
       await _loadUserJoinedCommunities();
+      setState(() {});
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Topluluğa katıldın ✅")),
+        const SnackBar(content: Text("Topluluğa katıldın")),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Bir hata oluştu")),
+        SnackBar(content: Text("Hata: $e")),
       );
     }
   }
 
-  // 🔹 Scrollable kategori barı
   Widget _redditStyleCategoryBar() {
     return SizedBox(
       height: 50,
-      child: SingleChildScrollView(
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        child: Row(
-          children: redditCategories.map((cat) {
-            final selected = selectedCategory == cat;
-            return Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: GestureDetector(
-                onTap: () => setState(() {
-                  selectedCategory = cat;
-                  selectedTopic = null; // kategori değişince alt konuyu resetle
-                }),
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: selected ? Colors.black : Colors.white,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.grey.shade300, width: 1.2),
-                  ),
-                  child: Text(
-                    cat,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? Colors.white : Colors.black,
-                    ),
+        children: redditCategories.map((cat) {
+          final selected = selectedCategory == cat;
+          return Padding(
+            padding: const EdgeInsets.only(right: 10),
+            child: GestureDetector(
+              onTap: () => setState(() {
+                selectedCategory = cat;
+                selectedTopic = null;
+              }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(
+                  color: selected ? Colors.black : Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.2),
+                ),
+                child: Text(
+                  cat,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: selected ? Colors.white : Colors.black,
                   ),
                 ),
               ),
-            );
-          }).toList(),
-        ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
-  // 🔹 Alt konular yatay scroll, tıklanabilir ve seçiliyi işaretli
   Widget _buildTopicsBar() {
     final currentTopics = getTopicsData(l10n)[selectedCategory] ?? [];
 
@@ -226,19 +219,23 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         itemCount: currentTopics.length,
         itemBuilder: (context, index) {
           final topic = currentTopics[index];
-          final isSelected = selectedTopic?.toLowerCase() == topic.toLowerCase();
+          final isSelected =
+              selectedTopic?.toLowerCase() == topic.toLowerCase();
 
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: GestureDetector(
-              onTap: () => setState(() {
-                selectedTopic = isSelected ? null : topic; // seçiliyi toggle et
-              }),
+              onTap: () {
+                setState(() {
+                  selectedTopic = isSelected ? null : topic;
+                });
+              },
               child: Chip(
                 label: Text(topic),
-                backgroundColor: isSelected ? Colors.black : Colors.grey.shade200,
-                labelStyle:
-                TextStyle(color: isSelected ? Colors.white : Colors.black),
+                backgroundColor:
+                isSelected ? Colors.black : Colors.grey.shade200,
+                labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black),
               ),
             ),
           );
@@ -267,16 +264,14 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
                 backgroundImage: community["avatar_url"] != null
                     ? NetworkImage(community["avatar_url"])
                     : null,
-                child: community["avatar_url"] == null
-                    ? const Icon(Icons.group)
-                    : null,
+                child:
+                community["avatar_url"] == null ? const Icon(Icons.group) : null,
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   community["name"] ?? "",
-                  style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
               ),
             ],
@@ -297,7 +292,8 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
                 foregroundColor: Colors.black,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
               child: Text(joined ? "Katıldın" : "Katıl"),
             ),
@@ -324,8 +320,9 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
             backgroundImage: community["avatar_url"] != null
                 ? NetworkImage(community["avatar_url"])
                 : null,
-            child:
-            community["avatar_url"] == null ? const Icon(Icons.group) : null,
+            child: community["avatar_url"] == null
+                ? const Icon(Icons.group)
+                : null,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -348,12 +345,12 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           ElevatedButton(
             onPressed: joined ? null : () => _joinCommunity(community),
             style: ElevatedButton.styleFrom(
-              backgroundColor:
-              joined ? Colors.grey.shade300 : Colors.grey.shade200,
+              backgroundColor: joined ? Colors.grey.shade300 : Colors.grey.shade200,
               foregroundColor: Colors.black,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
             child: Text(joined ? "Katıldın" : "Katıl"),
           ),
@@ -366,6 +363,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   Widget build(BuildContext context) {
     l10n = AppLocalizations.of(context)!;
     redditCategories = getTopicsData(l10n).keys.toList();
+
     if (selectedCategory.isEmpty && redditCategories.isNotEmpty) {
       selectedCategory = redditCategories.first;
     }
@@ -376,34 +374,16 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
-        leading: const Icon(Icons.menu),
-        title: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(25),
-          ),
-          child: TextField(
-            onChanged: (v) => setState(() {
-              searchQuery = v;
-            }),
-            decoration: const InputDecoration(
-              hintText: "Topluluk ara",
-              border: InputBorder.none,
-              icon: Icon(Icons.search),
-            ),
+        title: TextField(
+          onChanged: (v) => setState(() {
+            searchQuery = v;
+          }),
+          decoration: const InputDecoration(
+            hintText: "Topluluk ara",
+            border: InputBorder.none,
+            icon: Icon(Icons.search),
           ),
         ),
-        actions: const [
-          SizedBox(width: 10),
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Colors.blueGrey,
-            child: Icon(Icons.person, color: Colors.white, size: 18),
-          ),
-          SizedBox(width: 14),
-        ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -413,40 +393,39 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           children: [
             const Text(
               "Konuya göre toplulukları keşfet",
-              style:
-              TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 14),
 
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _redditStyleCategoryBar(),
-                const SizedBox(height: 10),
-                _buildTopicsBar(), // 🔹 tıklanabilir alt konular
-              ],
-            ),
+            // Kategoriler
+            _redditStyleCategoryBar(),
+            const SizedBox(height: 10),
+
+            // Alt konular
+            _buildTopicsBar(),
 
             const SizedBox(height: 24),
-            const Text("Senin için önerilen",
-                style:
-                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
+            const Text(
+              "Senin için önerilen",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
+
             SizedBox(
               height: 180,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: recommended.map(_recommendedCard).toList(),
+                children: filteredRecommended.map(_recommendedCard).toList(),
               ),
             ),
 
             const SizedBox(height: 25),
-            const Text("Tüm topluluklar",
-                style:
-                TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
+            const Text(
+              "Tüm topluluklar",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 10),
+
             ..._filteredCommunities().map(_communityCard).toList(),
           ],
         ),

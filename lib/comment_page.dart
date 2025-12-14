@@ -14,6 +14,9 @@ class _CommentPageState extends State<CommentPage> {
   Map<int?, List<Map<String, dynamic>>> tree = {};
   final _text = TextEditingController();
 
+  /// Yeni eklenen: Yorumların yanıtlarını gizleyip açmak için
+  Map<int, bool> replyVisibility = {};
+
   @override
   void initState() {
     super.initState();
@@ -150,13 +153,10 @@ class _CommentPageState extends State<CommentPage> {
             onPressed: () async {
               final newText = editor.text.trim();
               if (newText.isNotEmpty) {
-                await Supabase.instance.client
-                    .from("comments")
-                    .update({
+                await Supabase.instance.client.from("comments").update({
                   "content": newText,
                   "comment_edited": DateTime.now().toIso8601String()
-                })
-                    .eq("id", commentId);
+                }).eq("id", commentId);
                 _fetchComments();
               }
               Navigator.pop(context);
@@ -187,6 +187,7 @@ class _CommentPageState extends State<CommentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Kullanıcı adı
           Text(
             c["profiles"]["username"],
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -194,10 +195,6 @@ class _CommentPageState extends State<CommentPage> {
 
           const SizedBox(height: 4),
           Text(c["content"]),
-
-          if (c["edited_at"] != null)
-            const Text("(düzenlendi)",
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
 
           Row(
             children: [
@@ -212,23 +209,38 @@ class _CommentPageState extends State<CommentPage> {
                     color: userVote == -1 ? Colors.blue : Colors.grey),
                 onPressed: () => _voteComment(c["id"], -1),
               ),
-
               TextButton(
                 onPressed: () => _showReplyDialog(c["id"]),
                 child: const Text("Yanıtla"),
               ),
-
               if (c["profiles"]["id"] == currentUser)
                 TextButton(
-                  onPressed: () =>
-                      _showEditDialog(c["id"], c["content"]),
+                  onPressed: () => _showEditDialog(c["id"], c["content"]),
                   child: const Text("Düzenle"),
                 ),
             ],
           ),
 
-          // Recursive child comments
-          for (var reply in children) _buildComment(reply, depth + 1),
+          // --- YANITLARI GÖR/GİZLE BUTONU ---
+          if (children.isNotEmpty)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  replyVisibility[c["id"]] =
+                  !(replyVisibility[c["id"]] ?? false);
+                });
+              },
+              child: Text(
+                (replyVisibility[c["id"]] ?? false)
+                    ? "Yanıtları gizle"
+                    : "${children.length} yanıtı gör",
+                style: const TextStyle(fontSize: 13),
+              ),
+            ),
+
+          // --- ÇOCUK YORUMLAR (SADECE AÇILINCA) ---
+          if (replyVisibility[c["id"]] ?? false)
+            for (var reply in children) _buildComment(reply, depth + 1),
         ],
       ),
     );
@@ -250,7 +262,7 @@ class _CommentPageState extends State<CommentPage> {
             ),
           ),
 
-          // Add new comment
+          // Yeni yorum ekleme
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
