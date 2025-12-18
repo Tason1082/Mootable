@@ -19,15 +19,31 @@ class _PostAddPageState extends State<PostAddPage> {
   File? _selectedImage;
   File? _selectedVideo;
   bool _loading = false;
-  String? _selectedCommunity;
 
-  final List<String> _communities = [
-    "Flutter",
-    "Teknoloji",
-    "Spor",
-    "Sanat",
-    "Mizah",
-  ];
+  String? _selectedCommunityId;
+
+  // 🔹 Communities (id + name almak ZORUNLU)
+  List<Map<String, dynamic>> _communities = [];
+  bool _isLoadingCommunities = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCommunities();
+  }
+
+  /// 🔹 Supabase'den communities çek
+  Future<void> _fetchCommunities() async {
+    final response = await Supabase.instance.client
+        .from('communities')
+        .select('id, name')
+        .order('name');
+
+    setState(() {
+      _communities = List<Map<String, dynamic>>.from(response);
+      _isLoadingCommunities = false;
+    });
+  }
 
   /// 🔹 Fotoğraf seç
   Future<void> _pickImage() async {
@@ -35,7 +51,7 @@ class _PostAddPageState extends State<PostAddPage> {
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
-        _selectedVideo = null; // aynı anda video olmasın
+        _selectedVideo = null;
       });
     }
   }
@@ -46,12 +62,12 @@ class _PostAddPageState extends State<PostAddPage> {
     if (picked != null) {
       setState(() {
         _selectedVideo = File(picked.path);
-        _selectedImage = null; // aynı anda foto olmasın
+        _selectedImage = null;
       });
     }
   }
 
-  /// 🔹 Görsel veya videoyu kaldır
+  /// 🔹 Medya kaldır
   void _removeMedia() {
     setState(() {
       _selectedImage = null;
@@ -59,27 +75,32 @@ class _PostAddPageState extends State<PostAddPage> {
     });
   }
 
-  /// 🔹 Gönderi yükle
+  /// 🔹 Post yükle
   Future<void> _uploadPost() async {
     setState(() => _loading = true);
 
     final user = Supabase.instance.client.auth.currentUser;
     String? mediaUrl;
 
-    // 🔸 Görsel veya video varsa yükle
     if (_selectedImage != null || _selectedVideo != null) {
       final file = _selectedImage ?? _selectedVideo!;
-      final folder = _selectedImage != null ? "images" : "videos";
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
-      await Supabase.instance.client.storage.from("posts").upload(fileName, file);
-      mediaUrl = Supabase.instance.client.storage.from("posts").getPublicUrl(fileName);
+      final fileName =
+          "${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}";
+
+      await Supabase.instance.client.storage
+          .from("posts")
+          .upload(fileName, file);
+
+      mediaUrl = Supabase.instance.client.storage
+          .from("posts")
+          .getPublicUrl(fileName);
     }
 
     await Supabase.instance.client.from("posts").insert({
       "user_id": user!.id,
       "title": _titleController.text.trim(),
       "content": _bodyController.text.trim(),
-      "community": _selectedCommunity,
+      "community": _selectedCommunityId, // 👈 SADECE BURASI DEĞİŞTİ
       "tags": _tagsController.text.trim(),
       "link": _linkController.text.trim(),
       "image_url": mediaUrl,
@@ -88,7 +109,6 @@ class _PostAddPageState extends State<PostAddPage> {
 
     setState(() => _loading = false);
     if (mounted) Navigator.pop(context, true);
-
   }
 
   @override
@@ -105,11 +125,6 @@ class _PostAddPageState extends State<PostAddPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: ElevatedButton(
               onPressed: _loading ? null : _uploadPost,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
               child: Text(_loading ? "Yükleniyor..." : "Paylaş"),
             ),
           ),
@@ -120,111 +135,140 @@ class _PostAddPageState extends State<PostAddPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔹 Topluluk seçimi
-            DropdownButtonFormField<String>(
-              value: _selectedCommunity,
-              decoration: InputDecoration(
-                labelText: "Bir topluluk seç",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              items: _communities
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedCommunity = v),
+
+            /// 🔥 TOPLULUK ARAMA (DAVRANIŞ AYNI)
+            _isLoadingCommunities
+                ? const Center(child: CircularProgressIndicator())
+                : Autocomplete<Map<String, dynamic>>(
+              displayStringForOption: (option) => option['name'],
+              optionsBuilder: (TextEditingValue textEditingValue) {
+                if (textEditingValue.text.isEmpty) {
+                  return _communities;
+                }
+                return _communities.where((c) =>
+                    c['name']
+                        .toLowerCase()
+                        .startsWith(textEditingValue.text.toLowerCase()));
+              },
+              onSelected: (selection) {
+                setState(() {
+                  _selectedCommunityId = selection['id'];
+                });
+              },
+              fieldViewBuilder: (
+                  context,
+                  textEditingController,
+                  focusNode,
+                  onFieldSubmitted,
+                  ) {
+                return TextField(
+                  controller: textEditingController,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: "Topluluk ara",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              },
             ),
+
             const SizedBox(height: 16),
 
-            // 🔹 Başlık
+            /// 🔹 Başlık
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(
                 labelText: "Başlık",
-                labelStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 border: InputBorder.none,
               ),
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
             ),
             const Divider(),
-            const SizedBox(height: 8),
 
-            // 🔹 Etiketler
+            /// 🔹 Etiket
             TextField(
               controller: _tagsController,
               decoration: InputDecoration(
-                labelText: "Etiket ve belirteç ekle (isteğe bağlı)",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelText: "Etiketler",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // 🔹 Bağlantı ekle
+            /// 🔹 Link
             TextField(
               controller: _linkController,
               decoration: InputDecoration(
-                labelText: "Bağlantı ekle (isteğe bağlı)",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                labelText: "Link",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
+
             const SizedBox(height: 16),
 
-            // 🔹 Gövde metni
+            /// 🔹 Gövde
             TextField(
               controller: _bodyController,
               maxLines: null,
               decoration: const InputDecoration(
-                hintText: "Gövde metni (isteğe bağlı)",
+                hintText: "Gönderi içeriği",
                 border: InputBorder.none,
               ),
             ),
-            const SizedBox(height: 12),
 
-            // 🔹 Görsel veya video önizleme
+            const SizedBox(height: 16),
+
+            /// 🔹 Medya Önizleme
             if (_selectedImage != null || _selectedVideo != null)
               Stack(
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: _selectedImage != null
-                        ? Image.file(_selectedImage!, height: 200, fit: BoxFit.cover)
+                        ? Image.file(
+                      _selectedImage!,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    )
                         : Container(
                       height: 200,
                       color: Colors.black12,
                       child: const Center(
-                        child: Icon(Icons.videocam, size: 60, color: Colors.black54),
+                        child: Icon(Icons.videocam, size: 60),
                       ),
                     ),
                   ),
                   Positioned(
                     right: 8,
                     top: 8,
-                    child: CircleAvatar(
-                      backgroundColor: Colors.black45,
-                      child: IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: _removeMedia,
-                      ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: _removeMedia,
                     ),
                   ),
                 ],
               ),
+
             const SizedBox(height: 20),
 
-            // 🔹 Alt ikonlar
+            /// 🔹 Alt ikonlar
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.link),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Bağlantı alanına link ekleyebilirsin")),
-                    );
-                  },
+                  icon: const Icon(Icons.image_outlined),
+                  onPressed: _pickImage,
                 ),
-                IconButton(icon: const Icon(Icons.image_outlined), onPressed: _pickImage),
-                IconButton(icon: const Icon(Icons.videocam_outlined), onPressed: _pickVideo),
-                IconButton(icon: const Icon(Icons.format_list_bulleted), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.campaign_outlined), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.videocam_outlined),
+                  onPressed: _pickVideo,
+                ),
               ],
             ),
           ],

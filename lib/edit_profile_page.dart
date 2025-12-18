@@ -20,22 +20,30 @@ class EditProfilePage extends StatefulWidget {
 
 class _EditProfilePageState extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _usernameController;
-  late TextEditingController _bioController;
+  late final TextEditingController _usernameController;
+  late final TextEditingController _bioController;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _usernameController = TextEditingController(text: widget.initialUsername ?? '');
-    _bioController = TextEditingController(text: widget.initialBio ?? '');
+    _usernameController =
+        TextEditingController(text: widget.initialUsername ?? '');
+    _bioController =
+        TextEditingController(text: widget.initialBio ?? '');
+  }
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _bioController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
-
     final l10n = AppLocalizations.of(context)!;
 
     try {
@@ -50,11 +58,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         );
         Navigator.pop(context, true);
       }
-    } catch (e) {
-      print("Profile update error: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.profile_saved_error)),
-      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.profile_saved_error)),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -63,29 +72,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n.edit_profile_title),
-        backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              const SizedBox(height: 10),
               Text(
                 l10n.username_label,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 6),
               TextFormField(
                 controller: _usernameController,
                 decoration: InputDecoration(
                   hintText: l10n.username_hint,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.person_outline),
                 ),
                 validator: (value) {
@@ -98,7 +106,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               const SizedBox(height: 20),
               Text(
                 l10n.bio_label,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                style: theme.textTheme.titleMedium,
               ),
               const SizedBox(height: 6),
               TextFormField(
@@ -106,27 +114,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 maxLines: 3,
                 decoration: InputDecoration(
                   hintText: l10n.bio_hint,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.info_outline),
                 ),
               ),
               const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _saving ? null : _saveProfile,
-                  icon: const Icon(Icons.save),
-                  label: Text(
-                    _saving ? l10n.saving_button : l10n.save_button,
-                    style: const TextStyle(color: Colors.white),
-                  ),
+              FilledButton.icon(
+                onPressed: _saving ? null : _saveProfile,
+                icon: const Icon(Icons.save),
+                label: Text(
+                  _saving ? l10n.saving_button : l10n.save_button,
                 ),
               ),
             ],
@@ -136,4 +132,5 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 }
+
 

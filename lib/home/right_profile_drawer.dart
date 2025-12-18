@@ -25,6 +25,8 @@ class RightProfileDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
 
     return Drawer(
       child: SafeArea(
@@ -32,23 +34,28 @@ class RightProfileDrawer extends StatelessWidget {
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              // Profil Fotoğrafı
+
+              /// AVATAR
               GestureDetector(
                 onTap: onUploadProfileImage,
                 child: CircleAvatar(
                   radius: 48,
+                  backgroundColor: colors.surfaceVariant,
                   backgroundImage:
                   profileImageUrl != null ? NetworkImage(profileImageUrl!) : null,
-                  child: profileImageUrl == null ? const Icon(Icons.person, size: 48) : null,
+                  child: profileImageUrl == null
+                      ? Icon(Icons.person, size: 48, color: colors.onSurfaceVariant)
+                      : null,
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // Kullanıcı adı
+              /// USERNAME
               Text(
                 username ?? loc.username_label,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
 
               if (bio != null && bio!.isNotEmpty) ...[
@@ -56,80 +63,80 @@ class RightProfileDrawer extends StatelessWidget {
                 Text(
                   bio!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.black54, fontSize: 15),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: colors.onSurfaceVariant),
                 ),
               ],
 
               const SizedBox(height: 30),
 
-              // Profili Düzenle
-              _cardButton(
+              /// ACTIONS
+              _menuTile(
+                context,
                 icon: Icons.edit,
                 title: loc.editProfile,
                 onTap: () async {
                   Navigator.pop(context);
-                  Future.microtask(() async {
-                    final updated = await Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (_) => EditProfilePage(
-                          userId: Supabase.instance.client.auth.currentUser!.id,
-                          initialUsername: username,
-                          initialBio: bio,
-                        ),
+                  final updated = await Navigator.of(context, rootNavigator: true)
+                      .push(
+                    MaterialPageRoute(
+                      builder: (_) => EditProfilePage(
+                        userId:
+                        Supabase.instance.client.auth.currentUser!.id,
+                        initialUsername: username,
+                        initialBio: bio,
                       ),
-                    );
-                    if (updated == true) refreshProfile();
-                  });
+                    ),
+                  );
+                  if (updated == true) refreshProfile();
                 },
               ),
 
-              // Kaydedilenler
-              _cardButton(
+              _menuTile(
+                context,
                 icon: Icons.bookmark,
                 title: loc.savedPosts,
                 onTap: () {
                   Navigator.pop(context);
-                  Future.microtask(() {
-                    Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(
-                        builder: (_) => SavedPostsPage(
-                          userId: Supabase.instance.client.auth.currentUser!.id,
-                        ),
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(
+                      builder: (_) => SavedPostsPage(
+                        userId:
+                        Supabase.instance.client.auth.currentUser!.id,
                       ),
-                    );
-                  });
+                    ),
+                  );
                 },
               ),
 
-              // Ayarlar
-              _cardButton(
+              _menuTile(
+                context,
                 icon: Icons.settings,
                 title: loc.settings,
                 onTap: () {
                   Navigator.pop(context);
-                  Future.microtask(() {
-                    Navigator.of(context, rootNavigator: true).push(
-                      MaterialPageRoute(builder: (_) => SettingsPage()),
-                    );
-                  });
+                  Navigator.of(context, rootNavigator: true).push(
+                    MaterialPageRoute(builder: (_) => const SettingsPage()),
+                  );
                 },
               ),
 
               const Spacer(),
 
-              _cardButton(
+              _menuTile(
+                context,
                 icon: Icons.logout,
                 title: loc.logout,
-                color: Colors.redAccent,
+                isDestructive: true,
                 onTap: () async {
                   await Supabase.instance.client.auth.signOut();
-                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                  Navigator.of(context, rootNavigator: true)
+                      .pushAndRemoveUntil(
                     MaterialPageRoute(builder: (_) => const LoginPage()),
-                        (route) => false, // önceki tüm sayfaları stackten temizle
+                        (_) => false,
                   );
                 },
               ),
-
             ],
           ),
         ),
@@ -137,42 +144,52 @@ class RightProfileDrawer extends StatelessWidget {
     );
   }
 
-  Widget _cardButton({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? color,
-  }) {
+  Widget _menuTile(
+      BuildContext context, {
+        required IconData icon,
+        required String title,
+        required VoidCallback onTap,
+        bool isDestructive = false,
+      }) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-          decoration: BoxDecoration(
-            color: Colors.grey.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Icon(icon, size: 26, color: color ?? Colors.black),
-              const SizedBox(width: 14),
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: color ?? Colors.black,
-                  fontWeight: FontWeight.w600,
+      child: Material(
+        color: colors.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 26,
+                  color:
+                  isDestructive ? colors.error : colors.onSurfaceVariant,
                 ),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: isDestructive
+                        ? colors.error
+                        : colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
 
 
 

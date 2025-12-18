@@ -52,7 +52,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .order("created_at", ascending: false);
 
       allCommunities = List<Map<String, dynamic>>.from(result);
-    } catch (e) {
+    } catch (_) {
       allCommunities = [];
     }
   }
@@ -85,7 +85,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .order("created_at", ascending: false);
 
       recommended = List<Map<String, dynamic>>.from(recs);
-    } catch (e) {
+    } catch (_) {
       recommended = [];
     }
   }
@@ -113,7 +113,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       await supabase.from("communities").select("*").inFilter("id", ids);
 
       userJoinedCommunities = List<Map<String, dynamic>>.from(comms);
-    } catch (e) {
+    } catch (_) {
       userJoinedCommunities = [];
     }
   }
@@ -130,10 +130,14 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
     final currentTopics =
-        getTopicsData(l10n)[selectedCategory]?.map((t) => t.toLowerCase()).toList() ??
+        getTopicsData(l10n)[selectedCategory]
+            ?.map((t) => t.toLowerCase())
+            .toList() ??
             [];
 
     return allCommunities.where((c) {
+      if (_isJoined(c)) return false;
+
       final topics =
       List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
 
@@ -143,8 +147,8 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       if (selectedTopic == null &&
           !topics.any((t) => currentTopics.contains(t))) return false;
 
-      final name = (c["name"] ?? "").toString().toLowerCase();
-      final desc = (c["description"] ?? "").toString().toLowerCase();
+      final name = (c["name"] ?? "").toLowerCase();
+      final desc = (c["description"] ?? "").toLowerCase();
 
       return name.contains(q) || desc.contains(q) || q.isEmpty;
     }).toList();
@@ -153,55 +157,36 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   Future<void> _joinCommunity(Map<String, dynamic> community) async {
     if (user == null) return;
 
-    try {
-      await supabase.from("user_communities").insert({
-        "user_id": user!.id,
-        "community_id": community["id"],
-        "joined_at": DateTime.now().toIso8601String(),
-      });
+    await supabase.from("user_communities").insert({
+      "user_id": user!.id,
+      "community_id": community["id"],
+      "joined_at": DateTime.now().toIso8601String(),
+    });
 
-      await _loadUserJoinedCommunities();
-      setState(() {});
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Topluluğa katıldın")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Hata: $e")),
-      );
-    }
+    await _loadUserJoinedCommunities();
+    setState(() {});
   }
 
-  Widget _redditStyleCategoryBar() {
+  /// 🔹 CATEGORY BAR
+  Widget _categoryBar(ColorScheme colors, TextTheme textTheme) {
     return SizedBox(
       height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: redditCategories.map((cat) {
           final selected = selectedCategory == cat;
+
           return Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: GestureDetector(
-              onTap: () => setState(() {
-                selectedCategory = cat;
-                selectedTopic = null;
-              }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                decoration: BoxDecoration(
-                  color: selected ? Colors.black : Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.grey.shade300, width: 1.2),
-                ),
-                child: Text(
-                  cat,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: selected ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
+            child: ChoiceChip(
+              label: Text(cat),
+              selected: selected,
+              onSelected: (_) {
+                setState(() {
+                  selectedCategory = cat;
+                  selectedTopic = null;
+                });
+              },
             ),
           );
         }).toList(),
@@ -209,152 +194,112 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-  Widget _buildTopicsBar() {
-    final currentTopics = getTopicsData(l10n)[selectedCategory] ?? [];
+  Widget _topicsBar(ColorScheme colors) {
+    final topics = getTopicsData(l10n)[selectedCategory] ?? [];
 
     return SizedBox(
       height: 40,
-      child: ListView.builder(
+      child: ListView(
         scrollDirection: Axis.horizontal,
-        itemCount: currentTopics.length,
-        itemBuilder: (context, index) {
-          final topic = currentTopics[index];
-          final isSelected =
+        children: topics.map((topic) {
+          final selected =
               selectedTopic?.toLowerCase() == topic.toLowerCase();
 
           return Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: GestureDetector(
-              onTap: () {
+            child: ChoiceChip(
+              label: Text(topic),
+              selected: selected,
+              onSelected: (_) {
                 setState(() {
-                  selectedTopic = isSelected ? null : topic;
+                  selectedTopic = selected ? null : topic;
                 });
               },
-              child: Chip(
-                label: Text(topic),
-                backgroundColor:
-                isSelected ? Colors.black : Colors.grey.shade200,
-                labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black),
-              ),
             ),
           );
-        },
+        }).toList(),
       ),
     );
   }
 
-  Widget _recommendedCard(Map<String, dynamic> community) {
+  Widget _recommendedCard(
+      BuildContext context, Map<String, dynamic> community) {
     final joined = _isJoined(community);
+    final colors = Theme.of(context).colorScheme;
 
-    return Container(
+    return SizedBox(
       width: 300,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+      child: Card(
+        surfaceTintColor: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                backgroundImage: community["avatar_url"] != null
-                    ? NetworkImage(community["avatar_url"])
-                    : null,
-                child:
-                community["avatar_url"] == null ? const Icon(Icons.group) : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: colors.surfaceVariant,
+                  backgroundImage: community["avatar_url"] != null
+                      ? NetworkImage(community["avatar_url"])
+                      : null,
+                  child: community["avatar_url"] == null
+                      ? Icon(Icons.groups, color: colors.onSurfaceVariant)
+                      : null,
+                ),
+                title: Text(
                   community["name"] ?? "",
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Text(
+                community["description"] ?? "",
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: joined ? null : () => _joinCommunity(community),
+                  child: Text(joined ? "Katıldın" : "Katıl"),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            community["description"] ?? "",
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const Spacer(),
-          Align(
-            alignment: Alignment.centerRight,
-            child: ElevatedButton(
-              onPressed: joined ? null : () => _joinCommunity(community),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.grey.shade200,
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: Text(joined ? "Katıldın" : "Katıl"),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _communityCard(Map<String, dynamic> community) {
+  Widget _communityCard(
+      BuildContext context, Map<String, dynamic> community) {
     final joined = _isJoined(community);
+    final colors = Theme.of(context).colorScheme;
 
-    return Container(
+    return Card(
+      surfaceTintColor: Colors.transparent,
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundImage: community["avatar_url"] != null
-                ? NetworkImage(community["avatar_url"])
-                : null,
-            child: community["avatar_url"] == null
-                ? const Icon(Icons.group)
-                : null,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  community["name"] ?? "",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  community["description"] ?? "",
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            onPressed: joined ? null : () => _joinCommunity(community),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: joined ? Colors.grey.shade300 : Colors.grey.shade200,
-              foregroundColor: Colors.black,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-            child: Text(joined ? "Katıldın" : "Katıl"),
-          ),
-        ],
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: colors.surfaceVariant,
+          backgroundImage: community["avatar_url"] != null
+              ? NetworkImage(community["avatar_url"])
+              : null,
+          child: community["avatar_url"] == null
+              ? Icon(Icons.groups, color: colors.onSurfaceVariant)
+              : null,
+        ),
+        title: Text(community["name"] ?? ""),
+        subtitle: Text(
+          community["description"] ?? "",
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: FilledButton(
+          onPressed: joined ? null : () => _joinCommunity(community),
+          child: Text(joined ? "Katıldın" : "Katıl"),
+        ),
       ),
     );
   }
@@ -368,20 +313,17 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       selectedCategory = redditCategories.first;
     }
 
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
         title: TextField(
-          onChanged: (v) => setState(() {
-            searchQuery = v;
-          }),
+          onChanged: (v) => setState(() => searchQuery = v),
           decoration: const InputDecoration(
             hintText: "Topluluk ara",
             border: InputBorder.none,
-            icon: Icon(Icons.search),
+            prefixIcon: Icon(Icons.search),
           ),
         ),
       ),
@@ -391,42 +333,38 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         padding: const EdgeInsets.all(12),
         child: ListView(
           children: [
-            const Text(
+            Text(
               "Konuya göre toplulukları keşfet",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 14),
-
-            // Kategoriler
-            _redditStyleCategoryBar(),
+            _categoryBar(colors, theme.textTheme),
             const SizedBox(height: 10),
-
-            // Alt konular
-            _buildTopicsBar(),
-
+            _topicsBar(colors),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               "Senin için önerilen",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
-
             SizedBox(
-              height: 180,
+              height: 200,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: filteredRecommended.map(_recommendedCard).toList(),
+                children: filteredRecommended
+                    .map((c) => _recommendedCard(context, c))
+                    .toList(),
               ),
             ),
-
             const SizedBox(height: 25),
-            const Text(
+            Text(
               "Tüm topluluklar",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: theme.textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
-
-            ..._filteredCommunities().map(_communityCard).toList(),
+            ..._filteredCommunities()
+                .map((c) => _communityCard(context, c))
+                .toList(),
           ],
         ),
       ),
