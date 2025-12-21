@@ -7,6 +7,7 @@ import '../community_explore_page.dart';
 import '../login_page.dart';
 import '../comment_page.dart';
 import '../post_page.dart';
+import '../quote_post_page.dart';
 import '../user_posts_page.dart';
 import '../saved_posts_page.dart';
 import '../TimeAgo.dart';
@@ -233,10 +234,8 @@ class HomePageState extends State<HomePage> {
             final post = posts[index];
             final postId = post["id"];
             final isSaved = post["is_saved"] == true;
-
             return Card(
-              margin:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               surfaceTintColor: Colors.transparent,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -248,29 +247,20 @@ class HomePageState extends State<HomePage> {
                   ListTile(
                     leading: CircleAvatar(
                       backgroundColor: colors.surfaceVariant,
-                      child: Icon(Icons.groups,
-                          color: colors.onSurfaceVariant),
+                      child: Icon(Icons.groups, color: colors.onSurfaceVariant),
                     ),
                     title: Text(
                       post["community_name"] ?? "",
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
-                      TimeAgo.format(
-                        context,
-                        DateTime.parse(post["created_at"]),
-                      ),
+                      TimeAgo.format(context, DateTime.parse(post["created_at"])),
                       style: theme.textTheme.bodySmall,
                     ),
                     trailing: post["is_member"] != true
                         ? TextButton(
-                      onPressed: () => joinCommunity(
-                        this,
-                        post["community"],
-                        index,
-                      ),
+                      onPressed: () => joinCommunity(this, post["community"], index),
                       child: const Text("Katıl"),
                     )
                         : null,
@@ -291,30 +281,23 @@ class HomePageState extends State<HomePage> {
                   ),
 
                   Padding(
-                    padding:
-                    const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
                     child: Row(
                       children: [
                         IconButton(
                           icon: Icon(
                             Icons.arrow_upward,
-                            color: post["user_vote"] == 1
-                                ? colors.primary
-                                : colors.onSurfaceVariant,
+                            color: post["user_vote"] == 1 ? colors.primary : colors.onSurfaceVariant,
                           ),
-                          onPressed: () =>
-                              toggleVote(this, postId, 1),
+                          onPressed: () => toggleVote(this, postId, 1),
                         ),
                         Text("${post["votes_count"] ?? 0}"),
                         IconButton(
                           icon: Icon(
                             Icons.arrow_downward,
-                            color: post["user_vote"] == -1
-                                ? colors.error
-                                : colors.onSurfaceVariant,
+                            color: post["user_vote"] == -1 ? colors.error : colors.onSurfaceVariant,
                           ),
-                          onPressed: () =>
-                              toggleVote(this, postId, -1),
+                          onPressed: () => toggleVote(this, postId, -1),
                         ),
                         const SizedBox(width: 8),
                         IconButton(
@@ -323,25 +306,31 @@ class HomePageState extends State<HomePage> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) =>
-                                    CommentPage(postId: postId),
+                                builder: (_) => CommentPage(postId: postId),
                               ),
                             );
                           },
                         ),
                         Text("${post["comment_count"] ?? 0}"),
                         const Spacer(),
+
+                        // Alıntı Yap Butonu sadece görünür
+                        IconButton(
+                          icon: const Icon(Icons.repeat),
+                          onPressed: () {Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => QuotePostPage(post: post),
+                            ),
+                          );}, // şimdilik boş
+                        ),
+
                         IconButton(
                           icon: Icon(
-                            isSaved
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            color: isSaved
-                                ? colors.secondary
-                                : colors.onSurfaceVariant,
+                            isSaved ? Icons.bookmark : Icons.bookmark_border,
+                            color: isSaved ? colors.secondary : colors.onSurfaceVariant,
                           ),
-                          onPressed: () =>
-                              toggleSave(this, postId, isSaved),
+                          onPressed: () => toggleSave(this, postId, isSaved),
                         ),
                       ],
                     ),
@@ -349,6 +338,8 @@ class HomePageState extends State<HomePage> {
                 ],
               ),
             );
+
+
           },
         ),
       ),

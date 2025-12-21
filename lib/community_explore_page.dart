@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'community/topic_data.dart';
+import 'theme/app_theme.dart';
 
 class CommunityExplorePage extends StatefulWidget {
   const CommunityExplorePage({super.key});
@@ -15,13 +16,10 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   final user = Supabase.instance.client.auth.currentUser;
 
   bool loading = true;
-
   List<Map<String, dynamic>> recommended = [];
   List<Map<String, dynamic>> allCommunities = [];
   List<Map<String, dynamic>> userJoinedCommunities = [];
-
   String searchQuery = "";
-
   late AppLocalizations l10n;
 
   List<String> redditCategories = [];
@@ -50,7 +48,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("communities")
           .select("*")
           .order("created_at", ascending: false);
-
       allCommunities = List<Map<String, dynamic>>.from(result);
     } catch (_) {
       allCommunities = [];
@@ -68,10 +65,8 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("user_interests")
           .select("interest_name")
           .eq("user_id", user!.id);
-
-      final interestNames = interests
-          .map((i) => i["interest_name"].toString().toLowerCase())
-          .toList();
+      final interestNames =
+      interests.map((i) => i["interest_name"].toString().toLowerCase()).toList();
 
       if (interestNames.isEmpty) {
         recommended = [];
@@ -101,7 +96,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("user_communities")
           .select("community_id")
           .eq("user_id", user!.id);
-
       final ids = joins.map((j) => j["community_id"]).toList();
 
       if (ids.isEmpty) {
@@ -111,7 +105,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
 
       final comms =
       await supabase.from("communities").select("*").inFilter("id", ids);
-
       userJoinedCommunities = List<Map<String, dynamic>>.from(comms);
     } catch (_) {
       userJoinedCommunities = [];
@@ -130,22 +123,16 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
     final currentTopics =
-        getTopicsData(l10n)[selectedCategory]
-            ?.map((t) => t.toLowerCase())
-            .toList() ??
-            [];
+        getTopicsData(l10n)[selectedCategory]?.map((t) => t.toLowerCase()).toList() ?? [];
 
     return allCommunities.where((c) {
       if (_isJoined(c)) return false;
 
-      final topics =
-      List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
+      final topics = List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
 
-      if (selectedTopic != null &&
-          !topics.contains(selectedTopic!.toLowerCase())) return false;
+      if (selectedTopic != null && !topics.contains(selectedTopic!.toLowerCase())) return false;
 
-      if (selectedTopic == null &&
-          !topics.any((t) => currentTopics.contains(t))) return false;
+      if (selectedTopic == null && !topics.any((t) => currentTopics.contains(t))) return false;
 
       final name = (c["name"] ?? "").toLowerCase();
       final desc = (c["description"] ?? "").toLowerCase();
@@ -167,20 +154,25 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     setState(() {});
   }
 
-  /// 🔹 CATEGORY BAR
-  Widget _categoryBar(ColorScheme colors, TextTheme textTheme) {
+  Widget _categoryBar() {
     return SizedBox(
       height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: redditCategories.map((cat) {
           final selected = selectedCategory == cat;
-
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: ChoiceChip(
-              label: Text(cat),
+              label: Text(
+                cat,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black,
+                ),
+              ),
               selected: selected,
+              selectedColor: AppTheme.primary,
+              backgroundColor: Colors.grey.shade200,
               onSelected: (_) {
                 setState(() {
                   selectedCategory = cat;
@@ -194,22 +186,26 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-  Widget _topicsBar(ColorScheme colors) {
+  Widget _topicsBar() {
     final topics = getTopicsData(l10n)[selectedCategory] ?? [];
-
     return SizedBox(
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: topics.map((topic) {
-          final selected =
-              selectedTopic?.toLowerCase() == topic.toLowerCase();
-
+          final selected = selectedTopic?.toLowerCase() == topic.toLowerCase();
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: ChoiceChip(
-              label: Text(topic),
+              label: Text(
+                topic,
+                style: TextStyle(
+                  color: selected ? Colors.white : Colors.black,
+                ),
+              ),
               selected: selected,
+              selectedColor: AppTheme.primary,
+              backgroundColor: Colors.grey.shade200,
               onSelected: (_) {
                 setState(() {
                   selectedTopic = selected ? null : topic;
@@ -222,11 +218,11 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-  Widget _recommendedCard(
-      BuildContext context, Map<String, dynamic> community) {
-    final joined = _isJoined(community);
-    final colors = Theme.of(context).colorScheme;
 
+
+
+  Widget _recommendedCard(BuildContext context, Map<String, dynamic> community) {
+    final joined = _isJoined(community);
     return SizedBox(
       width: 300,
       child: Card(
@@ -239,18 +235,15 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: CircleAvatar(
-                  backgroundColor: colors.surfaceVariant,
+                  backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
                   backgroundImage: community["avatar_url"] != null
                       ? NetworkImage(community["avatar_url"])
                       : null,
                   child: community["avatar_url"] == null
-                      ? Icon(Icons.groups, color: colors.onSurfaceVariant)
+                      ? Icon(Icons.groups, color: Theme.of(context).colorScheme.onSurfaceVariant)
                       : null,
                 ),
-                title: Text(
-                  community["name"] ?? "",
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                title: Text(community["name"] ?? "", style: Theme.of(context).textTheme.titleMedium),
               ),
               Text(
                 community["description"] ?? "",
@@ -260,9 +253,18 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
               const Spacer(),
               Align(
                 alignment: Alignment.centerRight,
-                child: FilledButton(
-                  onPressed: joined ? null : () => _joinCommunity(community),
-                  child: Text(joined ? "Katıldın" : "Katıl"),
+                child: joined
+                    ? FilledButton.tonal(
+                  onPressed: null,
+                  child: const Text("Katıldın"),
+                )
+                    : FilledButton(
+                  onPressed: () => _joinCommunity(community),
+                  style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.all(AppTheme.primary),
+                    foregroundColor: MaterialStateProperty.all(Colors.white),
+                  ),
+                  child: const Text("Katıl"),
                 ),
               ),
             ],
@@ -272,22 +274,19 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-  Widget _communityCard(
-      BuildContext context, Map<String, dynamic> community) {
+  Widget _communityCard(BuildContext context, Map<String, dynamic> community) {
     final joined = _isJoined(community);
-    final colors = Theme.of(context).colorScheme;
-
     return Card(
       surfaceTintColor: Colors.transparent,
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: colors.surfaceVariant,
+          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
           backgroundImage: community["avatar_url"] != null
               ? NetworkImage(community["avatar_url"])
               : null,
           child: community["avatar_url"] == null
-              ? Icon(Icons.groups, color: colors.onSurfaceVariant)
+              ? Icon(Icons.groups, color: Theme.of(context).colorScheme.onSurfaceVariant)
               : null,
         ),
         title: Text(community["name"] ?? ""),
@@ -296,9 +295,18 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: FilledButton(
-          onPressed: joined ? null : () => _joinCommunity(community),
-          child: Text(joined ? "Katıldın" : "Katıl"),
+        trailing: joined
+            ? FilledButton.tonal(
+          onPressed: null,
+          child: const Text("Katıldın"),
+        )
+            : FilledButton(
+          onPressed: () => _joinCommunity(community),
+          style: ButtonStyle(
+            backgroundColor: MaterialStateProperty.all(AppTheme.primary),
+            foregroundColor: MaterialStateProperty.all(Colors.white),
+          ),
+          child: const Text("Katıl"),
         ),
       ),
     );
@@ -312,9 +320,6 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     if (selectedCategory.isEmpty && redditCategories.isNotEmpty) {
       selectedCategory = redditCategories.first;
     }
-
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
 
     return Scaffold(
       appBar: AppBar(
@@ -333,38 +338,25 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         padding: const EdgeInsets.all(12),
         child: ListView(
           children: [
-            Text(
-              "Konuya göre toplulukları keşfet",
-              style: theme.textTheme.titleLarge,
-            ),
+            Text("Konuya göre toplulukları keşfet", style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 14),
-            _categoryBar(colors, theme.textTheme),
+            _categoryBar(),
             const SizedBox(height: 10),
-            _topicsBar(colors),
+            _topicsBar(),
             const SizedBox(height: 24),
-            Text(
-              "Senin için önerilen",
-              style: theme.textTheme.titleLarge,
-            ),
+            Text("Senin için önerilen", style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
             SizedBox(
               height: 200,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: filteredRecommended
-                    .map((c) => _recommendedCard(context, c))
-                    .toList(),
+                children: filteredRecommended.map((c) => _recommendedCard(context, c)).toList(),
               ),
             ),
             const SizedBox(height: 25),
-            Text(
-              "Tüm topluluklar",
-              style: theme.textTheme.titleLarge,
-            ),
+            Text("Tüm topluluklar", style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 10),
-            ..._filteredCommunities()
-                .map((c) => _communityCard(context, c))
-                .toList(),
+            ..._filteredCommunities().map((c) => _communityCard(context, c)).toList(),
           ],
         ),
       ),
