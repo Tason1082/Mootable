@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mootable/post_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
@@ -175,36 +176,31 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
             final post = _savedPosts[index];
             final imageUrl = post["image_url"];
             return GestureDetector(
-              onTap: () {
-                // 🔹 İstersen burada tıklanınca gönderiyi detaylı gösterebilirsin
-                showDialog(
-                  context: context,
-                  builder: (_) => Dialog(
-                    backgroundColor: Colors.black,
-                    insetPadding:
-                    const EdgeInsets.symmetric(horizontal: 10),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        _isVideo(imageUrl)
-                            ? _VideoPlayerWidget(videoUrl: imageUrl)
-                            : Image.network(imageUrl,
-                            fit: BoxFit.contain),
-                        Positioned(
-                          top: 10,
-                          right: 10,
-                          child: IconButton(
-                            icon: const Icon(Icons.close,
-                                color: Colors.white, size: 28),
-                            onPressed: () => Navigator.pop(context),
+                onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => DraggableScrollableSheet(
+                      initialChildSize: 0.95,
+                      builder: (_, controller) => Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                        ),
+                        child: SingleChildScrollView(
+                          controller: controller,
+                          child: PostCard(
+                            post: post,
+                            showActions: true, // ister kapat
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                );
-              },
-              child: ClipRRect(
+                  );
+                },
+
+            child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: _buildThumbnail(imageUrl),
               ),
