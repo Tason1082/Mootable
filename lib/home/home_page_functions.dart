@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../chat_page.dart';
 import '../community_explore_page.dart';
 import '../post_page.dart';
 import 'home_page.dart'; // _HomePageState'yi kullanabilmek için
@@ -243,7 +244,17 @@ void onItemTapped(HomePageState state, int index) {
         fetchPosts(state);
       }
     });
-  } else {
+  }if (index == 3) { // 👈 SOHBET
+    Navigator.push(
+      state.context,
+      MaterialPageRoute(
+        builder: (_) => const DefaultTabController(
+          length: 3,
+          child: ChatPage(),
+        ),
+      ),
+    );}
+  else {
     state.setState(() => state.selectedIndex = index);
   }
 }
