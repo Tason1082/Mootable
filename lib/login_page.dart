@@ -21,7 +21,8 @@ class _LoginPageState extends State<LoginPage> {
     final l10n = AppLocalizations.of(context)!;
 
     try {
-      final response = await Supabase.instance.client.auth.signInWithPassword(
+      final response =
+      await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
@@ -31,7 +32,6 @@ class _LoginPageState extends State<LoginPage> {
       if (user != null) {
         final supabase = Supabase.instance.client;
 
-        // Kullanıcının ilgilerini kontrol et
         final existingInterests = await supabase
             .from('user_interests')
             .select()
@@ -39,17 +39,14 @@ class _LoginPageState extends State<LoginPage> {
 
         if (!mounted) return;
 
-        if (existingInterests.isNotEmpty) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HomePage()),
-          );
-        } else {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const InterestSelectionPage()),
-          );
-        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => existingInterests.isNotEmpty
+                ? const HomePage()
+                : const InterestSelectionPage(),
+          ),
+        );
       } else {
         ErrorHandler.showError(context, l10n.login_failed);
       }
@@ -61,12 +58,12 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -75,41 +72,37 @@ class _LoginPageState extends State<LoginPage> {
                 height: 100,
               ),
               const SizedBox(height: 40),
+
               TextField(
                 controller: _emailController,
                 decoration: InputDecoration(
                   labelText: l10n.login_email_label,
-                  border: const OutlineInputBorder(),
                 ),
+                keyboardType: TextInputType.emailAddress,
               ),
+
               const SizedBox(height: 20),
+
               TextField(
                 controller: _passwordController,
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: l10n.login_password_label,
-                  border: const OutlineInputBorder(),
                 ),
               ),
+
               const SizedBox(height: 30),
+
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: FilledButton(
                   onPressed: _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:  const Color(0xFFFFB84D),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    l10n.login_button,
-                    style: const TextStyle(fontSize: 18, color: Colors.white),
-                  ),
+                  child: Text(l10n.login_button),
                 ),
               ),
+
               const SizedBox(height: 16),
+
               GestureDetector(
                 onTap: () {
                   Navigator.push(
@@ -119,9 +112,8 @@ class _LoginPageState extends State<LoginPage> {
                 },
                 child: Text(
                   l10n.signup_link,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.deepPurple,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.primary,
                     decoration: TextDecoration.underline,
                   ),
                 ),
@@ -133,4 +125,3 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 }
-

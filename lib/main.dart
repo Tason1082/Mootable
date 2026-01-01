@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:mootable/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'splash_page.dart';
 import 'error_handler.dart';
@@ -94,10 +95,13 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: _GlobalErrorHandler.navigatorKey,
+
       locale: _locale,
       themeMode: _themeMode,
-      theme: ThemeData.light(useMaterial3: true),
-      darkTheme: ThemeData.dark(useMaterial3: true),
+
+      // 🔥 BURASI KRİTİK
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme, // şimdilik aynı, sonra dark yazarsın
 
       localizationsDelegates: const [
         AppLocalizations.delegate,
@@ -112,6 +116,7 @@ class _MyAppState extends State<MyApp> {
 
       home: const SplashPage(),
     );
+
   }
 }
 
