@@ -181,9 +181,21 @@ class AppTheme {
     // BOTTOM NAV
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Color(0xFF121212),
-      selectedItemColor: Colors.white,
-      unselectedItemColor: Colors.grey,
+
+      selectedItemColor: Colors.white,        // 👈 AKTİF NET
+      unselectedItemColor: Colors.white60,    // 👈 PASİF AMA GÖRÜNÜR
+
+      selectedIconTheme: IconThemeData(
+        size: 26,
+      ),
+      unselectedIconTheme: IconThemeData(
+        size: 24,
+      ),
+
+      showUnselectedLabels: true,
+      type: BottomNavigationBarType.fixed,
     ),
+
 
     // FAB
     floatingActionButtonTheme: const FloatingActionButtonThemeData(

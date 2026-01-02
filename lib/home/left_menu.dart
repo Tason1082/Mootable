@@ -1,7 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+
 import '../community/CreateCommunityPage.dart';
 import '../my_community/my_community_page.dart';
+import 'chat_room.dart';
 
 void openLeftSideSheet(BuildContext context) {
   showGeneralDialog(
@@ -28,7 +30,10 @@ void openLeftSideSheet(BuildContext context) {
 
       return FadeTransition(
         opacity: fade,
-        child: SlideTransition(position: slide, child: child),
+        child: SlideTransition(
+          position: slide,
+          child: child,
+        ),
       );
     },
   );
@@ -45,6 +50,7 @@ class _LeftMenuContent extends StatelessWidget {
         backgroundColor: Colors.transparent,
         body: Stack(
           children: [
+            /// BLUR BACKGROUND
             Positioned.fill(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
@@ -53,6 +59,8 @@ class _LeftMenuContent extends StatelessWidget {
                 ),
               ),
             ),
+
+            /// LEFT MENU
             Align(
               alignment: Alignment.centerLeft,
               child: Container(
@@ -84,7 +92,7 @@ class _LeftMenuContent extends StatelessWidget {
 
                         const SizedBox(height: 30),
 
-                        // TOPLULUK OLUŞTUR
+                        /// TOPLULUK OLUŞTUR
                         _menuButton(
                           icon: Icons.group_add_outlined,
                           title: "Topluluk Oluştur",
@@ -100,7 +108,23 @@ class _LeftMenuContent extends StatelessWidget {
                           },
                         ),
 
-                        // TOPLULUKLARIM
+                        /// SOHBET ODALARI
+                        _menuButton(
+                          icon: Icons.chat_bubble_outline,
+                          title: "Sohbet Odaları",
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                const ChatRoomPage(),
+                              ),
+                            );
+                          },
+                        ),
+
+                        /// TOPLULUKLARIM
                         _menuButton(
                           icon: Icons.groups_outlined,
                           title: "Topluluklarım",
