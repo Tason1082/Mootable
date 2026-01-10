@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-import '../community_explore_page.dart';
+import '../community/community_explore_page.dart';
 import '../login_page.dart';
 import '../comment_page.dart';
 import '../post_page.dart';

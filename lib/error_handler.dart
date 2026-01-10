@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ErrorHandler {
@@ -8,6 +9,7 @@ class ErrorHandler {
     // 🔹 1. Supabase Auth Exception
     if (error is AuthException) {
       final msg = error.message.toLowerCase();
+
       if (msg.contains('invalid login credentials')) {
         return 'Geçersiz e-posta veya şifre.';
       } else if (msg.contains('email not confirmed')) {
@@ -17,12 +19,13 @@ class ErrorHandler {
       } else if (msg.contains('password')) {
         return 'Şifre hatalı veya geçersiz.';
       }
-      return 'Kimlik doğrulama hatası: ${error.message}';
+
+      return 'Kimlik doğrulama hatası.';
     }
 
     // 🔹 2. Supabase PostgrestException (veritabanı sorguları)
     if (error is PostgrestException) {
-      return 'Veritabanı hatası: ${error.message}';
+      return 'Veritabanı hatası oluştu.';
     }
 
     // 🔹 3. Ağ (internet) hataları
@@ -44,10 +47,45 @@ class ErrorHandler {
     }
 
     // 🔹 6. Bilinmeyen hata
-    return 'Bir hata oluştu: ${error.toString()}';
+    return 'Beklenmeyen bir hata oluştu.';
   }
 
-  static void showError(BuildContext context, dynamic error) {
+  /// 🔴 HER ŞEY BURAYA LOG DÜŞER
+  static void logError(dynamic error, [StackTrace? stackTrace]) {
+    debugPrint('================ ERROR LOG ================');
+    debugPrint('TYPE: ${error.runtimeType}');
+    debugPrint('ERROR: $error');
+
+    if (error is AuthException) {
+      debugPrint('AUTH MESSAGE: ${error.message}');
+      debugPrint('STATUS CODE: ${error.statusCode}');
+    }
+
+    if (error is PostgrestException) {
+      debugPrint('POSTGREST MESSAGE: ${error.message}');
+      debugPrint('DETAILS: ${error.details}');
+      debugPrint('HINT: ${error.hint}');
+      debugPrint('CODE: ${error.code}');
+    }
+
+    if (stackTrace != null) {
+      debugPrint('STACKTRACE:\n$stackTrace');
+    }
+
+    debugPrint('==========================================');
+
+    // 🔥 Production için hazır
+    // FirebaseCrashlytics.instance.recordError(error, stackTrace);
+  }
+
+  /// 🔴 UI + LOG AYNI ANDA
+  static void showError(
+      BuildContext context,
+      dynamic error, {
+        StackTrace? stackTrace,
+      }) {
+    logError(error, stackTrace);
+
     final message = getErrorMessage(error);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),

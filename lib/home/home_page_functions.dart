@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../chat_page.dart';
-import '../community_explore_page.dart';
+import '../community/community_explore_page.dart';
 import '../post_page.dart';
 import 'home_page.dart'; // _HomePageState'yi kullanabilmek için
 Future<void> fetchPosts(HomePageState state, {bool loadMore = false}) async {

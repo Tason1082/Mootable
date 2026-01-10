@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'community/topic_data.dart';
-import 'theme/app_theme.dart';
+import 'topic_data.dart';
+import '../theme/app_theme.dart';
 
 class CommunityExplorePage extends StatefulWidget {
   const CommunityExplorePage({super.key});
