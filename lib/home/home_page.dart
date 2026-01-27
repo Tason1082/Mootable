@@ -4,9 +4,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import '../community/community_explore_page.dart';
+import '../error_handler.dart';
 import '../login_page.dart';
-import '../comment_page.dart';
-import '../post_page.dart';
+import '../comment/comment_page.dart';
+import '../post/post_page.dart';
 import '../quote_post_page.dart';
 import '../user_posts_page.dart';
 import '../saved_posts_page.dart';
@@ -73,22 +74,29 @@ class HomePageState extends State<HomePage> {
     _scrollController.dispose();
     super.dispose();
   }
-
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
 
-    final profile = await Supabase.instance.client
-        .from("profiles")
-        .select("username, bio, avatar_url")
-        .eq("id", user!.id)
-        .maybeSingle();
+    try {
+      final profile = await Supabase.instance.client
+          .from("profiles")
+          .select("username, bio, avatar_url")
+          .eq("id", user!.id)
+          .maybeSingle();
 
-    setState(() {
-      username = profile?["username"] ?? "Anonim";
-      bio = profile?["bio"];
-      profileImageUrl = profile?["avatar_url"];
-    });
+      if (!mounted) return;
+
+      setState(() {
+        username = profile?["username"] ?? "Anonim";
+        bio = profile?["bio"];
+        profileImageUrl = profile?["avatar_url"];
+      });
+    } catch (e, st) {
+      if (!mounted) return;
+      ErrorHandler.showError(context, e, stackTrace: st);
+    }
   }
+
   Future<void> _uploadProfileImage() async {
     if (user == null) return;
 
@@ -125,16 +133,12 @@ class HomePageState extends State<HomePage> {
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Profil fotoğrafı yüklenemedi"),
-          ),
-        );
-      }
-    }
+    }  catch (e, st) {
+  if (!mounted) return;
+  ErrorHandler.showError(context, e, stackTrace: st);
   }
+
+}
 
   Widget _buildMediaWidget(String url) {
     final lower = url.toLowerCase();

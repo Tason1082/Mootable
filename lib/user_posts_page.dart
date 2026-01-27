@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
-import 'comment_page.dart';
+import 'comment/comment_page.dart';
 
 class UserPostsPage extends StatefulWidget {
   final String userId;

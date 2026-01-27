@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mootable/quote_post_page.dart';
-import '../TimeAgo.dart';
-import '../video_player_widget.dart';
+import '../../TimeAgo.dart';
+import '../../video_player_widget.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'comment_page.dart';
+import '../comment/comment_page.dart';
 
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;

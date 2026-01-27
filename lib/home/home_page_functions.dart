@@ -2,102 +2,111 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../chat_page.dart';
 import '../community/community_explore_page.dart';
-import '../post_page.dart';
+import '../post/post_page.dart';
 import 'home_page.dart'; // _HomePageState'yi kullanabilmek için
 Future<void> fetchPosts(HomePageState state, {bool loadMore = false}) async {
   if (state.isLoadingMore || (!state.hasMore && loadMore)) return;
 
-  if (!loadMore) state.setState(() => state.loading = true);
-  state.setState(() => state.isLoadingMore = true);
+  try {
+    if (!loadMore) state.setState(() => state.loading = true);
+    state.setState(() => state.isLoadingMore = true);
 
-  final posts = List<Map<String, dynamic>>.from(
-    await Supabase.instance.client
-        .from("posts")
-        .select("id, content, image_url, created_at, user_id, community")
-        .order("created_at", ascending: false)
-        .range(state.offset, state.offset + state.limit - 1),
-  );
+    final posts = List<Map<String, dynamic>>.from(
+      await Supabase.instance.client
+          .from("posts")
+          .select("id, content, image_url, created_at, user_id, community")
+          .order("created_at", ascending: false)
+          .range(state.offset, state.offset + state.limit - 1),
+    );
 
-  if (posts.isEmpty) {
+    if (posts.isEmpty) {
+      state.setState(() {
+        state.hasMore = false;
+        state.isLoadingMore = false;
+        state.loading = false;
+      });
+      return;
+    }
+
+    final List<Map<String, dynamic>> postsWithExtras = [];
+
+    for (final post in posts) {
+      final communityId = post["community"];
+
+      final communityMap = await Supabase.instance.client
+          .from("communities")
+          .select("name")
+          .eq("id", communityId)
+          .maybeSingle();
+
+      final memberMap = await Supabase.instance.client
+          .from("user_communities")
+          .select("id")
+          .eq("community_id", communityId)
+          .eq("user_id", state.user!.id)
+          .maybeSingle();
+
+      final votesList = List<Map<String, dynamic>>.from(
+        await Supabase.instance.client
+            .from("votes")
+            .select("user_id, vote")
+            .eq("post_id", post["id"]),
+      );
+
+      final commentsList = List<Map<String, dynamic>>.from(
+        await Supabase.instance.client
+            .from("comments")
+            .select("id")
+            .eq("post_id", post["id"]),
+      );
+
+      final savedMap = await Supabase.instance.client
+          .from("saves")
+          .select("id")
+          .eq("post_id", post["id"])
+          .eq("user_id", state.user!.id)
+          .maybeSingle();
+
+      final upvotes = votesList.where((v) => v["vote"] == 1).length;
+      final downvotes = votesList.where((v) => v["vote"] == -1).length;
+
+      final userVote = votesList.firstWhere(
+            (v) => v["user_id"] == state.user!.id,
+        orElse: () => {"vote": 0},
+      )["vote"];
+
+      postsWithExtras.add({
+        ...post,
+        "community_name": communityMap?["name"] ?? "Bilinmeyen Topluluk",
+        "votes_count": upvotes - downvotes,
+        "user_vote": userVote,
+        "comment_count": commentsList.length,
+        "is_saved": savedMap != null,
+        "is_member": memberMap != null,
+      });
+    }
+
     state.setState(() {
-      state.hasMore = false;
+      if (loadMore) {
+        state.posts.addAll(postsWithExtras);
+      } else {
+        state.posts = postsWithExtras;
+      }
+
+      state.offset += state.limit;
+      state.hasMore = posts.length == state.limit;
       state.isLoadingMore = false;
       state.loading = false;
     });
-    return;
-  }
-
-  List<Map<String, dynamic>> postsWithExtras = [];
-
-  for (final post in posts) {
-    final String communityId = post["community"];
-
-    final communityMap = await Supabase.instance.client
-        .from("communities")
-        .select("name")
-        .eq("id", communityId)
-        .maybeSingle();
-
-    final memberMap = await Supabase.instance.client
-        .from("user_communities")
-        .select("id")
-        .eq("community_id", communityId)
-        .eq("user_id", state.user!.id)
-        .maybeSingle();
-
-    final votesList = List<Map<String, dynamic>>.from(
-      await Supabase.instance.client
-          .from("votes")
-          .select("user_id, vote")
-          .eq("post_id", post["id"]),
-    );
-
-    final commentsList = List<Map<String, dynamic>>.from(
-      await Supabase.instance.client
-          .from("comments")
-          .select("id")
-          .eq("post_id", post["id"]),
-    );
-
-    final savedMap = await Supabase.instance.client
-        .from("saves")
-        .select("id")
-        .eq("post_id", post["id"])
-        .eq("user_id", state.user!.id)
-        .maybeSingle();
-
-    final upvotes = votesList.where((v) => v["vote"] == 1).length;
-    final downvotes = votesList.where((v) => v["vote"] == -1).length;
-
-    final userVote = votesList.firstWhere(
-          (v) => v["user_id"] == state.user!.id,
-      orElse: () => {"vote": 0},
-    )["vote"];
-
-    postsWithExtras.add({
-      ...post,
-      "community_name": communityMap?["name"] ?? "Bilinmeyen Topluluk",
-      "votes_count": upvotes - downvotes,
-      "user_vote": userVote,
-      "comment_count": commentsList.length,
-      "is_saved": savedMap != null,
-      "is_member": memberMap != null, // 🔥 ÖNEMLİ
+  } catch (e, st) {
+    state.setState(() {
+      state.isLoadingMore = false;
+      state.loading = false;
     });
+    Error.throwWithStackTrace(e, st);
   }
-
-  state.setState(() {
-    if (loadMore) {
-      state.posts.addAll(postsWithExtras);
-    } else {
-      state.posts = postsWithExtras;
-    }
-
-    state.offset += state.limit;
-    state.hasMore = posts.length == state.limit;
-    state.isLoadingMore = false;
-    state.loading = false;
-  });
 }
+
 
 
 Future<void> joinCommunity(
@@ -114,17 +123,11 @@ Future<void> joinCommunity(
     state.setState(() {
       state.posts[postIndex]["is_member"] = true;
     });
-
-    ScaffoldMessenger.of(state.context).showSnackBar(
-      const SnackBar(content: Text("Topluluğa katıldın 🎉")),
-    );
-  } catch (e) {
-    print("Join error: $e");
-    ScaffoldMessenger.of(state.context).showSnackBar(
-      const SnackBar(content: Text("Topluluğa katılamadın")),
-    );
+  } catch (e, st) {
+    Error.throwWithStackTrace(e, st);
   }
 }
+
 
 
 

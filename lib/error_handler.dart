@@ -6,9 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ErrorHandler {
   static String getErrorMessage(dynamic error) {
-    // 🔹 1. Supabase Auth Exception
     if (error is AuthException) {
-      final msg = error.message.toLowerCase();
+      final msg = (error.message ?? '').toLowerCase();
 
       if (msg.contains('invalid login credentials')) {
         return 'Geçersiz e-posta veya şifre.';
@@ -23,32 +22,32 @@ class ErrorHandler {
       return 'Kimlik doğrulama hatası.';
     }
 
-    // 🔹 2. Supabase PostgrestException (veritabanı sorguları)
     if (error is PostgrestException) {
-      return 'Veritabanı hatası oluştu.';
+      if (error.code == '42501') {
+        return 'Bu işlem için yetkiniz yok.';
+      }
+      return 'Veritabanı işlemi sırasında hata oluştu.';
     }
 
-    // 🔹 3. Ağ (internet) hataları
     if (error is SocketException) {
       return 'İnternet bağlantısı hatası. Lütfen bağlantınızı kontrol edin.';
     }
 
-    // 🔹 4. Timeout veya sunucu yanıt vermedi
     if (error is TimeoutException) {
       return 'Sunucu yanıt vermiyor. Lütfen tekrar deneyin.';
     }
 
-    // 🔹 5. Genel hata mesajları
-    final message = error.toString().toLowerCase();
+    final message = error is Exception
+        ? error.toString().toLowerCase()
+        : '';
+
     if (message.contains('too many requests')) {
       return 'Çok fazla istek gönderildi. Lütfen bekleyin.';
-    } else if (message.contains('network')) {
-      return 'Ağ bağlantısı hatası.';
     }
 
-    // 🔹 6. Bilinmeyen hata
     return 'Beklenmeyen bir hata oluştu.';
   }
+
 
   /// 🔴 HER ŞEY BURAYA LOG DÜŞER
   static void logError(dynamic error, [StackTrace? stackTrace]) {
@@ -87,9 +86,12 @@ class ErrorHandler {
     logError(error, stackTrace);
 
     final message = getErrorMessage(error);
+    if (!context.mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+
   }
 }
 

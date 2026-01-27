@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mootable/post_card.dart';
+import 'package:mootable/post/post_card.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
