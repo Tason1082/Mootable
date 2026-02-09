@@ -2,8 +2,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+
+import 'package:image_picker/image_picker.dart';
+
 
 import '../core/api_config.dart';
 
@@ -19,21 +22,32 @@ class _PostAddPageState extends State<PostAddPage> {
   final _bodyController = TextEditingController();
   final _tagsController = TextEditingController();
   final _linkController = TextEditingController();
+  final _storage = const FlutterSecureStorage();
 
   File? _selectedImage;
-  bool _loading = false;
+  File? _selectedVideo;
 
+  bool _loading = false;
   String? _selectedCommunityId;
 
   /// Foto seç
   Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-    );
-
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked != null) {
       setState(() {
         _selectedImage = File(picked.path);
+        _selectedVideo = null;
+      });
+    }
+  }
+
+  /// Video seç
+  Future<void> _pickVideo() async {
+    final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() {
+        _selectedVideo = File(picked.path);
+        _selectedImage = null;
       });
     }
   }
@@ -42,64 +56,69 @@ class _PostAddPageState extends State<PostAddPage> {
   void _removeMedia() {
     setState(() {
       _selectedImage = null;
+      _selectedVideo = null;
     });
   }
 
-  /// API'ye gönder
   Future<void> _uploadPost() async {
     setState(() => _loading = true);
 
     try {
-      final url = Uri.parse("${ApiConfig.baseUrl}/posts");
+      final uri = Uri.parse("${ApiConfig.baseUrl}/api/posts");
+      final request = http.MultipartRequest("POST", uri);
+
+      final token = await _storage.read(key: "token");
+
+      if (token == null) {
+        throw Exception("Token yok, login gerekli");
+      }
+
+      request.headers["Authorization"] = "Bearer $token";
 
       final tags = _tagsController.text
           .split(',')
           .map((e) => e.trim())
           .toList();
 
-      final body = {
-        "title": _titleController.text.trim(),
-        "content": _bodyController.text.trim(),
-        "imageUrl": null, // şimdilik null
-        "link": _linkController.text.trim(),
-        "community": _selectedCommunityId,
-        "tags": tags,
-      };
+      request.fields["title"] = _titleController.text.trim();
+      request.fields["content"] = _bodyController.text.trim();
+      request.fields["link"] = _linkController.text.trim();
+      request.fields["tags"] = jsonEncode(tags);
 
-      final response = await http.post(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: jsonEncode(body),
-      );
+      if (_selectedCommunityId != null) {
+        request.fields["community"] = _selectedCommunityId!;
+      }
 
-      debugPrint("STATUS: ${response.statusCode}");
-      debugPrint("BODY: ${response.body}");
+      if (_selectedImage != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath("Media", _selectedImage!.path),
+        );
+      }
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        debugPrint("✅ Post eklendi");
+      if (_selectedVideo != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath("Media", _selectedVideo!.path),
+        );
+      }
 
-        if (mounted) {
-          Navigator.pop(context, true);
-        }
+      final response = await request.send();
+      final body = await response.stream.bytesToString();
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (mounted) Navigator.pop(context, true);
       } else {
-        debugPrint("❌ API Error");
-
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Hata: ${response.statusCode}")),
+          SnackBar(content: Text("Hata: $body")),
         );
       }
     } catch (e) {
-      debugPrint("🔥 Exception: $e");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Bağlantı hatası")),
-      );
+      debugPrint("Exception: $e");
     }
 
     setState(() => _loading = false);
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,52 +139,35 @@ class _PostAddPageState extends State<PostAddPage> {
           ),
         ],
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
-
             TextField(
               controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: "Başlık",
-              ),
+              decoration: const InputDecoration(labelText: "Başlık"),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               controller: _tagsController,
-              decoration: const InputDecoration(
-                labelText: "Etiketler (virgülle)",
-              ),
+              decoration:
+              const InputDecoration(labelText: "Etiketler (virgülle)"),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               controller: _linkController,
-              decoration: const InputDecoration(
-                labelText: "Link",
-              ),
+              decoration: const InputDecoration(labelText: "Link"),
             ),
-
             const SizedBox(height: 12),
-
             TextField(
               controller: _bodyController,
               maxLines: null,
-              decoration: const InputDecoration(
-                labelText: "İçerik",
-              ),
+              decoration: const InputDecoration(labelText: "İçerik"),
             ),
-
             const SizedBox(height: 16),
 
+            /// Foto preview
             if (_selectedImage != null)
               Stack(
                 children: [
@@ -174,10 +176,36 @@ class _PostAddPageState extends State<PostAddPage> {
                     child: Image.file(
                       _selectedImage!,
                       height: 200,
+                      width: double.infinity,
                       fit: BoxFit.cover,
                     ),
                   ),
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: _removeMedia,
+                    ),
+                  ),
+                ],
+              ),
 
+            /// Video preview
+            if (_selectedVideo != null)
+              Stack(
+                children: [
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.black12,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.play_circle_fill, size: 64),
+                    ),
+                  ),
                   Positioned(
                     right: 0,
                     top: 0,
@@ -190,13 +218,16 @@ class _PostAddPageState extends State<PostAddPage> {
               ),
 
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 IconButton(
                   icon: const Icon(Icons.image),
                   onPressed: _pickImage,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.videocam),
+                  onPressed: _pickVideo,
                 ),
               ],
             ),
@@ -206,4 +237,3 @@ class _PostAddPageState extends State<PostAddPage> {
     );
   }
 }
-

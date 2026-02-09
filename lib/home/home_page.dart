@@ -139,30 +139,27 @@ class HomePageState extends State<HomePage> {
   }
 
 }
-
   Widget _buildMediaWidget(String url) {
-    final lower = url.toLowerCase();
+    final uri = Uri.parse(url);
+    final path = uri.path.toLowerCase(); // ?token kısmını kaldırıyoruz
 
-    if (lower.endsWith(".mp4") ||
-        lower.endsWith(".mov") ||
-        lower.endsWith(".avi") ||
-        lower.endsWith(".webm")) {
+    if (path.endsWith(".mp4") || path.endsWith(".mov") || path.endsWith(".avi") || path.endsWith(".webm")) {
       return AspectRatio(
         aspectRatio: 1,
         child: VideoPlayerWidget(videoUrl: url),
       );
     }
 
-    if (lower.endsWith(".jpg") ||
-        lower.endsWith(".jpeg") ||
-        lower.endsWith(".png") ||
-        lower.endsWith(".gif")) {
+    if (path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".png") || path.endsWith(".gif")) {
       return Image.network(
         url,
         width: double.infinity,
+        height: 200,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-        const Center(child: Icon(Icons.broken_image)),
+        errorBuilder: (context, error, stackTrace) {
+          print("Resim yüklenemedi: $error");
+          return const Center(child: Icon(Icons.broken_image));
+        },
       );
     }
 
@@ -172,6 +169,7 @@ class HomePageState extends State<HomePage> {
       child: const Center(child: Text("Desteklenmeyen medya türü")),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -254,14 +252,16 @@ class HomePageState extends State<HomePage> {
                       child: Icon(Icons.groups, color: colors.onSurfaceVariant),
                     ),
                     title: Text(
-                      post["community_name"] ?? "",
+                      post["community"] ?? "",
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis,
                     ),
                     subtitle: Text(
-                      TimeAgo.format(context, DateTime.parse(post["created_at"])),
-                      style: theme.textTheme.bodySmall,
+                      post["createdAt"] != null
+                          ? TimeAgo.format(context, DateTime.parse(post["created_at"]))
+                          : "",
                     ),
+
                     trailing: post["is_member"] != true
                         ? TextButton(
                       onPressed: () => joinCommunity(this, post["community"], index),
@@ -270,10 +270,10 @@ class HomePageState extends State<HomePage> {
                         : null,
                   ),
 
-                  if (post["image_url"] != null)
+                  if (post["imageUrl"] != null)
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: _buildMediaWidget(post["image_url"]),
+                      child: _buildMediaWidget(post["imageUrl"]),
                     ),
 
                   Padding(

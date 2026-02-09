@@ -1,9 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:http/http.dart' as http;
+
+
+import 'core/api_config.dart';
 import 'signup_page.dart';
 import 'error_handler.dart';
-import 'InterestSelectionPage.dart';
 import 'home/home_page.dart';
+
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class LoginPage extends StatefulWidget {
@@ -14,46 +19,49 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  final _storage = const FlutterSecureStorage();
 
   Future<void> _login() async {
-    final l10n = AppLocalizations.of(context)!;
-
     try {
-      final response =
-      await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      final response = await http.post(
+        Uri.parse("${ApiConfig.baseUrl}/api/auth/login"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": _emailController.text.trim(),
+          "password": _passwordController.text.trim(),
+        }),
       );
 
-      final user = response.user;
+      if (!mounted) return; // 🔥 HER await sonrası
 
-      if (user != null) {
-        final supabase = Supabase.instance.client;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
 
-        final existingInterests = await supabase
-            .from('user_interests')
-            .select()
-            .eq('user_id', user.id);
+        await _storage.write(key: "token", value: data["token"]);
 
-        if (!mounted) return;
+        if (!mounted) return; // 🔥 yine
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(
-            builder: (_) => existingInterests.isNotEmpty
-                ? const HomePage()
-                : const InterestSelectionPage(),
-          ),
+          MaterialPageRoute(builder: (_) => const HomePage()),
         );
       } else {
-        ErrorHandler.showError(context, l10n.login_failed);
+        final data = jsonDecode(response.body);
+
+        if (!mounted) return;
+
+        ErrorHandler.showError(context, data["message"]);
       }
-    } catch (e) {
-      ErrorHandler.showError(context, e);
+    } catch (e, st) {
+      if (!mounted) return;
+
+      ErrorHandler.showError(context, e, stackTrace: st);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -67,18 +75,15 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Image.asset(
-                'assets/logoTansparent.png',
-                height: 100,
-              ),
+              Image.asset('assets/logoTansparent.png', height: 100),
               const SizedBox(height: 40),
 
               TextField(
                 controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   labelText: l10n.login_email_label,
                 ),
-                keyboardType: TextInputType.emailAddress,
               ),
 
               const SizedBox(height: 20),

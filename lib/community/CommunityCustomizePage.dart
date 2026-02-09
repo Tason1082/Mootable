@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'topic_selection_page.dart';
-
+//2
 class CommunityCustomizePage extends StatefulWidget {
   final String name;
   final String description;

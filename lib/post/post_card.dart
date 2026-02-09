@@ -27,6 +27,9 @@ class _PostCardState extends State<PostCard> {
   void initState() {
     super.initState();
     post = widget.post;
+
+    debugPrint("POST DATA => $post");
+    debugPrint("IMAGE URL => ${post["imageUrl"]}");
   }
 
   bool _isVideo(String url) {
@@ -198,10 +201,10 @@ class _PostCardState extends State<PostCard> {
           ),
 
           /// MEDIA
-          if (post["image_url"] != null)
+          if (post["imageUrl"] != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: _buildMedia(post["image_url"]),
+              child: _buildMedia(post["imageUrl"]),
             ),
 
           /// CONTENT

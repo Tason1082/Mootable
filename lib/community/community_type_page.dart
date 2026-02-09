@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+
+import '../core/api_client.dart';
 import '../home/home_page.dart';
-
+//4
 class CommunityTypePage extends StatefulWidget {
   final String name;
   final String description;
@@ -30,43 +33,33 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
   bool isLoading = false;
 
   Future<void> _finish() async {
-    final supabase = Supabase.instance.client;
-
     setState(() => isLoading = true);
 
     try {
-      final userId = supabase.auth.currentUser?.id;
+      final response = await ApiClient.dio.post(
+        "/api/communities",
+        data: {
+          "name": widget.name,
+          "description": widget.description,
+          "topics": widget.selectedTopics
+              .map((t) => t.toLowerCase())
+              .toList(),
+          "type": communityType,
+          "isAdult": isAdult,
+        },
+      );
 
-      if (userId == null) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.session_not_found)),
+          SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
         );
-        return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+              (_) => false,
+        );
       }
-
-      await supabase.from('communities').insert({
-        'name': widget.name,
-        'description': widget.description,
-        'banner_url': widget.bannerUrl,
-        'icon_url': widget.iconUrl,
-        'topics': widget.selectedTopics
-            .map((t) => t.toString().toLowerCase())
-            .toList(), // 🔹 tüm topic’leri küçük harfe çevir
-        'type': communityType,
-        'is_adult': isAdult,
-        'created_by': userId,
-      }).select();
-
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
-      );
-
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
-            (route) => false,
-      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -75,6 +68,8 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
       setState(() => isLoading = false);
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {

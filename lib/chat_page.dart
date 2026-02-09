@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'newchatpage.dart';
+
 class ChatPage extends StatelessWidget {
   const ChatPage({super.key});
 
@@ -158,9 +160,17 @@ class ChatPage extends StatelessWidget {
         floatingActionButton: FloatingActionButton(
           backgroundColor: Colors.white,
           elevation: 3,
-          onPressed: () {},
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const NewChatPage(),
+              ),
+            );
+          },
           child: const Icon(Icons.add_comment, color: Colors.black),
         ),
+
       ),
     );
   }

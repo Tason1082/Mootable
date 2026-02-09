@@ -128,7 +128,6 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
-
 class _GlobalErrorHandler {
   static final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -140,9 +139,13 @@ class _GlobalErrorHandler {
 
     final message = ErrorHandler.getErrorMessage(error);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    });
   }
 }
 

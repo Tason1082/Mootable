@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'topic_data.dart';
 import 'community_type_page.dart'; // Bu dosyan senin zaten mevcut
-
+//3
 class TopicSelectionPage extends StatefulWidget {
   final String name;
   final String description;
