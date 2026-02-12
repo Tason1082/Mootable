@@ -1,11 +1,116 @@
 import 'package:flutter/material.dart';
 
+import 'chat/chat_detail_page.dart';
+import 'chat/conversation_list_model.dart';
+import 'chat/conversation_service.dart';
 import 'newchatpage.dart';
 
-class ChatPage extends StatelessWidget {
+class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
 
-  void _showMarkAllReadDialog(BuildContext context) {
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends State<ChatPage> {
+  List<ConversationListModel> conversations = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final list = await ConversationService.getAll();
+
+      setState(() {
+        conversations = list;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("LOAD ERROR: $e");
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  Widget _buildConversationList() {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (conversations.isEmpty) {
+      return const SizedBox();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.builder(
+        itemCount: conversations.length,
+        itemBuilder: (context, index) {
+          final convo = conversations[index];
+
+          return ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFFE0E0E0),
+              child: Icon(Icons.chat_bubble_outline, color: Colors.black),
+            ),
+            title: Text(
+              convo.name,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: Text(
+              convo.lastMessage.isNotEmpty
+                  ? convo.lastMessage
+                  : "Henüz mesaj yok",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing: convo.lastMessageAt != null
+                ? Text(
+              _formatDate(convo.lastMessageAt!),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.grey,
+              ),
+            )
+                : null,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ChatDetailPage(conversationId: convo.id),
+                ),
+              );
+
+              _load(); // geri dönünce liste refresh olsun
+            },
+
+          );
+        },
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    } else if (difference.inDays == 1) {
+      return "Dün";
+    } else {
+      return "${date.day}.${date.month}.${date.year}";
+    }
+  }
+
+  void _showMarkAllReadDialog() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -37,7 +142,7 @@ class ChatPage extends StatelessWidget {
     );
   }
 
-  void _showChatFilterDialog(BuildContext context) {
+  void _showChatFilterDialog() {
     bool groupChats = true;
     bool directChats = true;
     bool modMail = true;
@@ -46,7 +151,7 @@ class ChatPage extends StatelessWidget {
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateDialog) {
             return AlertDialog(
               title: const Text(
                 "Sohbetleri filtrele",
@@ -58,21 +163,20 @@ class ChatPage extends StatelessWidget {
                   _SmallFilterOption(
                     label: "Grup sohbetleri",
                     value: groupChats,
-                    onChanged: (v) => setState(() => groupChats = v),
+                    onChanged: (v) => setStateDialog(() => groupChats = v),
                   ),
                   _SmallFilterOption(
                     label: "Doğrudan sohbetler",
                     value: directChats,
-                    onChanged: (v) => setState(() => directChats = v),
+                    onChanged: (v) => setStateDialog(() => directChats = v),
                   ),
                   _SmallFilterOption(
                     label: "Mod mail",
                     value: modMail,
-                    onChanged: (v) => setState(() => modMail = v),
+                    onChanged: (v) => setStateDialog(() => modMail = v),
                   ),
                 ],
               ),
-              actionsPadding: const EdgeInsets.symmetric(horizontal: 8),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
@@ -114,28 +218,6 @@ class ChatPage extends StatelessWidget {
             "Sohbetler",
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          leading: IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () {},
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.check_circle_outline),
-              tooltip: "Tümünü okundu işaretle",
-              onPressed: () => _showMarkAllReadDialog(context),
-            ),
-            IconButton(
-              icon: const Icon(Icons.tune),
-              onPressed: () => _showChatFilterDialog(context),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: CircleAvatar(
-                radius: 16,
-                backgroundColor: Color(0xFFE0E0E0),
-              ),
-            ),
-          ],
           bottom: const TabBar(
             indicatorColor: Colors.black,
             indicatorWeight: 2,
@@ -148,43 +230,47 @@ class ChatPage extends StatelessWidget {
               Tab(text: "İleti dizisi"),
             ],
           ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline),
+              onPressed: _showMarkAllReadDialog,
+            ),
+            IconButton(
+              icon: const Icon(Icons.tune),
+              onPressed: _showChatFilterDialog,
+            ),
+            const Padding(
+              padding: EdgeInsets.only(right: 12),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Color(0xFFE0E0E0),
+              ),
+            ),
+          ],
         ),
-        body: const TabBarView(
+        body: TabBarView(
           children: [
-            EmptyChatView(),
-            EmptyChatView(),
-            EmptyChatView(),
-            EmptyChatView(),
+            _buildConversationList(),
+            const SizedBox(),
+            const SizedBox(),
+            const SizedBox(),
           ],
         ),
         floatingActionButton: FloatingActionButton(
           backgroundColor: Colors.white,
           elevation: 3,
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async {
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => const NewChatPage(),
               ),
             );
+
+            _load();
           },
           child: const Icon(Icons.add_comment, color: Colors.black),
         ),
-
-      ),
-    );
-  }
-}
-
-class EmptyChatView extends StatelessWidget {
-  const EmptyChatView({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        "Sohbete hoş geldin.",
-        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
       ),
     );
   }
@@ -205,24 +291,21 @@ class _SmallFilterOption extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => onChanged(!value),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          children: [
-            Checkbox(
-              value: value,
-              visualDensity: VisualDensity.compact,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              onChanged: (v) => onChanged(v ?? false),
+      child: Row(
+        children: [
+          Checkbox(
+            value: value,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: (v) => onChanged(v ?? false),
+          ),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 13),
             ),
-            Expanded(
-              child: Text(
-                label,
-                style: const TextStyle(fontSize: 13),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

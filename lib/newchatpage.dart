@@ -1,5 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+
+import '../core/api_client.dart';
+import 'chat/chat_detail_page.dart';
+import 'chat/conversation_service.dart';
+
 
 class NewChatPage extends StatefulWidget {
   const NewChatPage({super.key});
@@ -12,75 +17,107 @@ class _NewChatPageState extends State<NewChatPage> {
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _groupNameController = TextEditingController();
 
-  final List<String> _allUsers = [
-    "Ahmet",
-    "Ayşe",
-    "Mehmet",
-    "Zeynep",
-    "Can",
-    "Elif",
-  ];
+  List<UserDto> users = [];
+  final Set<String> selectedUserIds = {};
 
-  final Set<String> _selectedUsers = {};
+  bool loading = true;
+  String query = "";
 
-  String _query = "";
+  // =========================
+  // INIT
+  // =========================
+  @override
+  void initState() {
+    super.initState();
+    fetchUsers();
+  }
 
-  void _toggleUser(String user) {
+  // =========================
+  // API → USERS
+  // =========================
+  Future<void> fetchUsers() async {
+    try {
+      final res = await ApiClient.dio.get("/api/users");
+
+      final data = res.data as List;
+
+      setState(() {
+        users = data.map((e) => UserDto.fromJson(e)).toList();
+        loading = false;
+      });
+    } on DioException catch (e) {
+      debugPrint(e.message);
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Kullanıcılar yüklenemedi")),
+      );
+    }
+  }
+
+  // =========================
+  // USER SELECT
+  // =========================
+  void toggleUser(String id) {
     setState(() {
-      if (_selectedUsers.contains(user)) {
-        _selectedUsers.remove(user);
+      if (selectedUserIds.contains(id)) {
+        selectedUserIds.remove(id);
       } else {
-        _selectedUsers.add(user);
+        selectedUserIds.add(id);
       }
     });
   }
 
-  void _createChat() {
-    if (_selectedUsers.isEmpty) return;
+  // =========================
+  // CREATE CONVERSATION
+  // =========================
+  Future<void> createChat() async {
+    if (selectedUserIds.isEmpty) return;
 
-    if (_selectedUsers.length == 1) {
-      /// Direkt sohbet
-      final user = _selectedUsers.first;
+    try {
+      final ids = selectedUserIds.toList();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("$user ile sohbet başlatıldı")),
+      final title =
+      ids.length == 1 ? null : _groupNameController.text.trim();
+
+      final conversationId = await ConversationService.create(
+        title: title,
+        userIds: ids,
       );
-    } else {
-      /// Grup sohbeti
-      final groupName = _groupNameController.text.trim();
 
-      if (groupName.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Grup adı giriniz")),
-        );
-        return;
-      }
+      if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              "$groupName adlı grup oluşturuldu (${_selectedUsers.length} kişi)"),
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) =>
+              ChatDetailPage(conversationId: conversationId),
         ),
       );
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.toString())));
     }
-
-    Navigator.pop(context);
   }
 
+  // =========================
+  // UI
+  // =========================
   @override
   Widget build(BuildContext context) {
-    final filteredUsers = _allUsers
-        .where((u) => u.toLowerCase().contains(_query.toLowerCase()))
+    final filtered = users
+        .where((u) =>
+        u.username.toLowerCase().contains(query.toLowerCase()))
         .toList();
 
-    final isGroup = _selectedUsers.length >= 2;
+    final isGroup = selectedUserIds.length >= 2;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text("Yeni Sohbet"),
         actions: [
           TextButton(
-            onPressed: _createChat,
+            onPressed: createChat,
             child: const Text(
               "Oluştur",
               style: TextStyle(fontWeight: FontWeight.w600),
@@ -88,14 +125,16 @@ class _NewChatPageState extends State<NewChatPage> {
           ),
         ],
       ),
-      body: Column(
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
         children: [
-          /// 🔍 Arama
+          // 🔍 SEARCH
           Padding(
             padding: const EdgeInsets.all(12),
             child: TextField(
               controller: _searchController,
-              onChanged: (v) => setState(() => _query = v),
+              onChanged: (v) => setState(() => query = v),
               decoration: InputDecoration(
                 hintText: "Kullanıcı ara",
                 prefixIcon: const Icon(Icons.search),
@@ -109,20 +148,22 @@ class _NewChatPageState extends State<NewChatPage> {
             ),
           ),
 
-          /// 👥 Seçim sayacı
-          if (_selectedUsers.isNotEmpty)
+          // 👥 Selected count
+          if (selectedUserIds.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  "${_selectedUsers.length} kişi seçildi",
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  "${selectedUserIds.length} kişi seçildi",
+                  style: const TextStyle(
+                      fontSize: 12, color: Colors.grey),
                 ),
               ),
             ),
 
-          /// 🟢 Grup adı (2+ kişi seçilince)
+          // 🟢 GROUP NAME
           if (isGroup)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -141,28 +182,52 @@ class _NewChatPageState extends State<NewChatPage> {
               ),
             ),
 
-          /// 👤 Kullanıcı listesi
+          // 👤 USER LIST
           Expanded(
             child: ListView.builder(
-              itemCount: filteredUsers.length,
-              itemBuilder: (_, index) {
-                final user = filteredUsers[index];
-                final selected = _selectedUsers.contains(user);
+              itemCount: filtered.length,
+              itemBuilder: (_, i) {
+                final user = filtered[i];
+                final selected =
+                selectedUserIds.contains(user.id);
 
                 return ListTile(
                   leading: const CircleAvatar(),
-                  title: Text(user),
+                  title: Text(user.username),
                   trailing: Checkbox(
                     value: selected,
-                    onChanged: (_) => _toggleUser(user),
+                    onChanged: (_) =>
+                        toggleUser(user.id),
                   ),
-                  onTap: () => _toggleUser(user),
+                  onTap: () => toggleUser(user.id),
                 );
               },
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+//
+// =========================
+// DTO
+// =========================
+//
+class UserDto {
+  final String id;
+  final String username;
+
+  UserDto({
+    required this.id,
+    required this.username,
+  });
+
+  factory UserDto.fromJson(Map<String, dynamic> json) {
+    return UserDto(
+      id: json["id"],
+      username: json["username"],
     );
   }
 }
