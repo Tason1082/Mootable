@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:dio/dio.dart';
+
+import '../core/api_client.dart';
+
 
 class CommentPage extends StatefulWidget {
   final int postId;
@@ -14,7 +17,7 @@ class _CommentPageState extends State<CommentPage> {
   Map<int?, List<Map<String, dynamic>>> tree = {};
   final _text = TextEditingController();
 
-  /// Yeni eklenen: Yorumların yanıtlarını gizleyip açmak için
+  /// Yanıtları gizleyip açmak için
   Map<int, bool> replyVisibility = {};
 
   @override
@@ -22,99 +25,85 @@ class _CommentPageState extends State<CommentPage> {
     super.initState();
     _fetchComments();
   }
+  @override
+  void dispose() {
+    _text.dispose();
+    super.dispose();
+  }
 
   Future<void> _fetchComments() async {
-    final data = await Supabase.instance.client
-        .from("comments")
-        .select('''
-          id,
-          content,
-          created_at,
-          comment_edited,
-          parent_id,
-          profiles(id, username),
-          comment_votes(vote, user_id)
-        ''')
-        .eq("post_id", widget.postId)
-        .order("created_at", ascending: true);
+    try {
+      final res = await ApiClient.dio.get('/api/comments/post/${widget.postId}');
+      comments = List<Map<String, dynamic>>.from(res.data);
 
-    comments = List<Map<String, dynamic>>.from(data);
+      tree = {};
+      for (var c in comments) {
+        final pid = c["parent_id"];
+        tree.putIfAbsent(pid, () => []);
+        tree[pid]!.add(c);
+      }
 
-    tree = {};
-    for (var c in comments) {
-      final pid = c["parent_id"];
-      tree.putIfAbsent(pid, () => []);
-      tree[pid]!.add(c);
+      setState(() {});
+    } catch (e) {
+      print("Yorumları çekerken hata: $e");
     }
-
-    setState(() {});
   }
 
   Future<void> _addComment() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null || _text.text.trim().isEmpty) return;
+    final content = _text.text.trim();
+    if (content.isEmpty) return;
 
-    await Supabase.instance.client.from("comments").insert({
-      "post_id": widget.postId,
-      "user_id": user.id,
-      "content": _text.text.trim(),
-      "parent_id": null,
-    });
+    try {
+      await ApiClient.dio.post('/api/comments', data: {
+        "postId": widget.postId,
+        "content": content,
+      });
 
-    _text.clear();
-    _fetchComments();
+      _text.clear();
+      _fetchComments();
+    } catch (e) {
+      print("Yorum eklerken hata: $e");
+    }
   }
 
   Future<void> _addReply(int parentId, String content) async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null || content.trim().isEmpty) return;
+    if (content.trim().isEmpty) return;
 
-    await Supabase.instance.client.from("comments").insert({
-      "post_id": widget.postId,
-      "user_id": user.id,
-      "content": content.trim(),
-      "parent_id": parentId,
-    });
+    try {
+      await ApiClient.dio.post('/api/comments', data: {
+        "postId": widget.postId,
+        "content": content,
+        "parentId": parentId,
+      });
 
-    _fetchComments();
+      _fetchComments();
+    } catch (e) {
+      print("Yanıt eklerken hata: $e");
+    }
   }
 
   Future<void> _voteComment(int commentId, int vote) async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) return;
+    try {
+      final res = await ApiClient.dio.post(
+        '/api/comments/$commentId/vote',
+        data: { "vote": vote },
+      );
 
-    final existing = await client
-        .from("comment_votes")
-        .select()
-        .eq("comment_id", commentId)
-        .eq("user_id", user.id);
+      final updated = res.data;
 
-    if (existing.isEmpty) {
-      await client.from("comment_votes").insert({
-        "comment_id": commentId,
-        "user_id": user.id,
-        "vote": vote,
+      setState(() {
+        final index = comments.indexWhere((c) => c["id"] == commentId);
+        if (index != -1) {
+          comments[index]["score"] = updated["score"];
+          comments[index]["userVote"] = updated["userVote"];
+        }
       });
-    } else {
-      final oldVote = existing[0]["vote"];
-      if (oldVote == vote) {
-        await client
-            .from("comment_votes")
-            .delete()
-            .eq("comment_id", commentId)
-            .eq("user_id", user.id);
-      } else {
-        await client
-            .from("comment_votes")
-            .update({"vote": vote})
-            .eq("comment_id", commentId)
-            .eq("user_id", user.id);
-      }
-    }
 
-    _fetchComments();
+    } catch (e) {
+      print("Oy verirken hata: $e");
+    }
   }
+
 
   void _showReplyDialog(int parentId) {
     TextEditingController replyText = TextEditingController();
@@ -144,19 +133,15 @@ class _CommentPageState extends State<CommentPage> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text("Düzenle"),
-        content: TextField(
-          controller: editor,
-          maxLines: null,
-        ),
+        content: TextField(controller: editor, maxLines: null),
         actions: [
           TextButton(
             onPressed: () async {
               final newText = editor.text.trim();
               if (newText.isNotEmpty) {
-                await Supabase.instance.client.from("comments").update({
+                await ApiClient.dio.put('/api/comments/$commentId', data: {
                   "content": newText,
-                  "comment_edited": DateTime.now().toIso8601String()
-                }).eq("id", commentId);
+                });
                 _fetchComments();
               }
               Navigator.pop(context);
@@ -169,16 +154,9 @@ class _CommentPageState extends State<CommentPage> {
   }
 
   Widget _buildComment(Map<String, dynamic> c, int depth) {
-    final currentUser = Supabase.instance.client.auth.currentUser?.id;
-
-    final votes = (c["comment_votes"] as List?) ?? [];
-    int score = 0;
-    int userVote = 0;
-
-    for (var v in votes) {
-      score += (v["vote"] as num).toInt();
-      if (v["user_id"] == currentUser) userVote = v["vote"];
-    }
+    final votes = c["votes"] ?? [];
+    int score = c["score"] ?? 0;
+    int userVote = c["userVote"] ?? 0;
 
     final children = tree[c["id"]] ?? [];
 
@@ -187,58 +165,37 @@ class _CommentPageState extends State<CommentPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Kullanıcı adı
-          Text(
-            c["profiles"]["username"],
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-
+          Text(c["username"] ?? "Bilinmeyen", style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text(c["content"]),
-
+          Text(c["content"] ?? ""),
           Row(
             children: [
               IconButton(
-                icon: Icon(Icons.arrow_upward,
-                    color: userVote == 1 ? Colors.orange : Colors.grey),
+                icon: Icon(Icons.arrow_upward, color: userVote == 1 ? Colors.orange : Colors.grey),
                 onPressed: () => _voteComment(c["id"], 1),
               ),
               Text(score.toString()),
               IconButton(
-                icon: Icon(Icons.arrow_downward,
-                    color: userVote == -1 ? Colors.blue : Colors.grey),
+                icon: Icon(Icons.arrow_downward, color: userVote == -1 ? Colors.blue : Colors.grey),
                 onPressed: () => _voteComment(c["id"], -1),
               ),
-              TextButton(
-                onPressed: () => _showReplyDialog(c["id"]),
-                child: const Text("Yanıtla"),
-              ),
-              if (c["profiles"]["id"] == currentUser)
-                TextButton(
-                  onPressed: () => _showEditDialog(c["id"], c["content"]),
-                  child: const Text("Düzenle"),
-                ),
+              TextButton(onPressed: () => _showReplyDialog(c["id"]), child: const Text("Yanıtla")),
+              if (c["isOwner"] == true)
+                TextButton(onPressed: () => _showEditDialog(c["id"], c["content"]), child: const Text("Düzenle")),
             ],
           ),
-
-          // --- YANITLARI GÖR/GİZLE BUTONU ---
           if (children.isNotEmpty)
             TextButton(
               onPressed: () {
                 setState(() {
-                  replyVisibility[c["id"]] =
-                  !(replyVisibility[c["id"]] ?? false);
+                  replyVisibility[c["id"]] = !(replyVisibility[c["id"]] ?? false);
                 });
               },
               child: Text(
-                (replyVisibility[c["id"]] ?? false)
-                    ? "Yanıtları gizle"
-                    : "${children.length} yanıtı gör",
+                (replyVisibility[c["id"]] ?? false) ? "Yanıtları gizle" : "${children.length} yanıtı gör",
                 style: const TextStyle(fontSize: 13),
               ),
             ),
-
-          // --- ÇOCUK YORUMLAR (SADECE AÇILINCA) ---
           if (replyVisibility[c["id"]] ?? false)
             for (var reply in children) _buildComment(reply, depth + 1),
         ],
@@ -255,29 +212,14 @@ class _CommentPageState extends State<CommentPage> {
       body: Column(
         children: [
           Expanded(
-            child: ListView(
-              children: [
-                for (var c in roots) _buildComment(c, 0),
-              ],
-            ),
+            child: ListView(children: [for (var c in roots) _buildComment(c, 0)]),
           ),
-
-          // Yeni yorum ekleme
           Padding(
             padding: const EdgeInsets.all(10),
             child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _text,
-                    decoration:
-                    const InputDecoration(hintText: "Yorum yaz..."),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  onPressed: _addComment,
-                )
+                Expanded(child: TextField(controller: _text, decoration: const InputDecoration(hintText: "Yorum yaz..."))),
+                IconButton(icon: const Icon(Icons.send), onPressed: _addComment),
               ],
             ),
           )
@@ -286,3 +228,4 @@ class _CommentPageState extends State<CommentPage> {
     );
   }
 }
+

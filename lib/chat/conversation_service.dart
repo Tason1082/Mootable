@@ -16,21 +16,19 @@ class ConversationService {
         .toList();
   }
 
-
   // CREATE
   static Future<int> create({
     String? title,
-    required List<String> userIds, // user id string olabilir
+    required List<String> userIds,
   }) async {
     final res = await ApiClient.dio.post(
       "/api/conversations",
       data: {
-        "title": title,
-        "userIds": userIds,
+        "name": title,
+        "memberIds": userIds,
       },
     );
-
-    return res.data as int; // 🔥 int
+    return res.data as int;
   }
 
   // DETAIL
@@ -41,16 +39,20 @@ class ConversationService {
   }
 
   // SEND
+  // SEND
   static Future<void> sendMessage(
       int conversationId,
-      String text,
-      ) async {
+      String text, {
+        String? receiverId,
+      }) async {
     await ApiClient.dio.post(
       "/api/messages",
       data: {
         "conversationId": conversationId,
+        "receiverId": receiverId, // 🔥 EKLENDİ
         "content": text,
       },
     );
   }
+
 }

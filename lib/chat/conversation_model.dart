@@ -7,15 +7,15 @@ class ConversationModel {
 
   ConversationModel({
     required this.id,
-    required this.title,
+    this.title,
     required this.messages,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
     return ConversationModel(
-      id: json["id"], // küçük harf
-      title: json["title"],
-      messages: (json["messages"] as List? ?? [])
+      id: json['id'],
+      title: json['title'],
+      messages: (json['messages'] as List)
           .map((e) => MessageModel.fromJson(e))
           .toList(),
     );

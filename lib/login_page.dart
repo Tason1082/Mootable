@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
-
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 import 'core/api_config.dart';
 import 'signup_page.dart';
@@ -35,20 +35,48 @@ class _LoginPageState extends State<LoginPage> {
         }),
       );
 
-      if (!mounted) return; // 🔥 HER await sonrası
+      if (!mounted) return;
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        await _storage.write(key: "token", value: data["token"]);
+        final token = data["token"];
 
-        if (!mounted) return; // 🔥 yine
+        // token kaydet
+        await _storage.write(key: "token", value: token);
+
+        // JWT decode
+        final decoded = JwtDecoder.decode(token);
+
+        final userId = decoded[
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+        ];
+        final username = decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"];
+        print("LOGIN USER ID SAVED => $userId");
+
+        await _storage.write(key: "userId", value: userId.toString());
+
+
+        print("========= JWT FULL =========");
+        print(decoded);
+        print("===========================");
+
+
+
+
+
+        await _storage.write(key: "userId", value: userId);
+
+        print("LOGIN USER ID SAVED => $userId");
+
+        if (!mounted) return;
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomePage()),
         );
-      } else {
+      }
+      else {
         final data = jsonDecode(response.body);
 
         if (!mounted) return;
@@ -61,7 +89,6 @@ class _LoginPageState extends State<LoginPage> {
       ErrorHandler.showError(context, e, stackTrace: st);
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

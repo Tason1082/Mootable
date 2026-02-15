@@ -5,7 +5,6 @@ import '../core/api_client.dart';
 import 'chat/chat_detail_page.dart';
 import 'chat/conversation_service.dart';
 
-
 class NewChatPage extends StatefulWidget {
   const NewChatPage({super.key});
 
@@ -23,9 +22,6 @@ class _NewChatPageState extends State<NewChatPage> {
   bool loading = true;
   String query = "";
 
-  // =========================
-  // INIT
-  // =========================
   @override
   void initState() {
     super.initState();
@@ -38,7 +34,6 @@ class _NewChatPageState extends State<NewChatPage> {
   Future<void> fetchUsers() async {
     try {
       final res = await ApiClient.dio.get("/api/users");
-
       final data = res.data as List;
 
       setState(() {
@@ -48,7 +43,6 @@ class _NewChatPageState extends State<NewChatPage> {
     } on DioException catch (e) {
       debugPrint(e.message);
       setState(() => loading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Kullanıcılar yüklenemedi")),
       );
@@ -76,9 +70,7 @@ class _NewChatPageState extends State<NewChatPage> {
 
     try {
       final ids = selectedUserIds.toList();
-
-      final title =
-      ids.length == 1 ? null : _groupNameController.text.trim();
+      final title = ids.length == 1 ? null : _groupNameController.text.trim();
 
       final conversationId = await ConversationService.create(
         title: title,
@@ -87,11 +79,31 @@ class _NewChatPageState extends State<NewChatPage> {
 
       if (!mounted) return;
 
+      final isDm = ids.length == 1;
+
+      // DM ise receiverId al
+      String? receiverId;
+      if (isDm) {
+        receiverId = ids.first;
+      }
+
+      if (isDm) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Var olan DM açıldı")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Yeni grup sohbeti oluşturuldu")),
+        );
+      }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              ChatDetailPage(conversationId: conversationId),
+          builder: (_) => ChatDetailPage(
+            conversationId: conversationId,
+            receiverId: receiverId, // receiverId’yi ChatDetailPage’e gönder
+          ),
         ),
       );
     } catch (e) {
@@ -100,14 +112,11 @@ class _NewChatPageState extends State<NewChatPage> {
     }
   }
 
-  // =========================
-  // UI
-  // =========================
+
   @override
   Widget build(BuildContext context) {
     final filtered = users
-        .where((u) =>
-        u.username.toLowerCase().contains(query.toLowerCase()))
+        .where((u) => u.username.toLowerCase().contains(query.toLowerCase()))
         .toList();
 
     final isGroup = selectedUserIds.length >= 2;
@@ -151,14 +160,12 @@ class _NewChatPageState extends State<NewChatPage> {
           // 👥 Selected count
           if (selectedUserIds.isNotEmpty)
             Padding(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
                   "${selectedUserIds.length} kişi seçildi",
-                  style: const TextStyle(
-                      fontSize: 12, color: Colors.grey),
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ),
             ),
@@ -188,16 +195,14 @@ class _NewChatPageState extends State<NewChatPage> {
               itemCount: filtered.length,
               itemBuilder: (_, i) {
                 final user = filtered[i];
-                final selected =
-                selectedUserIds.contains(user.id);
+                final selected = selectedUserIds.contains(user.id);
 
                 return ListTile(
                   leading: const CircleAvatar(),
                   title: Text(user.username),
                   trailing: Checkbox(
                     value: selected,
-                    onChanged: (_) =>
-                        toggleUser(user.id),
+                    onChanged: (_) => toggleUser(user.id),
                   ),
                   onTap: () => toggleUser(user.id),
                 );
@@ -210,11 +215,9 @@ class _NewChatPageState extends State<NewChatPage> {
   }
 }
 
-//
 // =========================
 // DTO
 // =========================
-//
 class UserDto {
   final String id;
   final String username;
@@ -231,3 +234,4 @@ class UserDto {
     );
   }
 }
+
