@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'topic_data.dart';
+import '../core/api_client.dart';
 import '../theme/app_theme.dart';
 
 class CommunityExplorePage extends StatefulWidget {
@@ -16,31 +16,77 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   final user = Supabase.instance.client.auth.currentUser;
 
   bool loading = true;
+  bool _categoriesLoaded = false;
+
   List<Map<String, dynamic>> recommended = [];
   List<Map<String, dynamic>> allCommunities = [];
   List<Map<String, dynamic>> userJoinedCommunities = [];
-  String searchQuery = "";
-  late AppLocalizations l10n;
 
-  List<String> redditCategories = [];
-  String selectedCategory = "";
-  String? selectedTopic;
+  List<Map<String, dynamic>> categories = [];
+  Map<String, List<Map<String, dynamic>>> categoryTopics = {};
+
+  String selectedCategoryKey = "";
+  String? selectedTopicKey;
+  String searchQuery = "";
+
+  // ================= INIT =================
 
   @override
-  void initState() {
-    super.initState();
-    _loadAllData();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_categoriesLoaded) {
+      _loadInitialData();
+      _categoriesLoaded = true;
+    }
   }
 
-  Future<void> _loadAllData() async {
+  Future<void> _loadInitialData() async {
     setState(() => loading = true);
+
     await Future.wait([
+      _loadCategoriesFromApi(),
       _loadAllCommunities(),
       _loadUserInterestsAndRecommended(),
       _loadUserJoinedCommunities(),
     ]);
+
     setState(() => loading = false);
   }
+
+  // ================= CATEGORY API =================
+
+  Future<void> _loadCategoriesFromApi() async {
+    try {
+      final locale =
+          Localizations.localeOf(context).languageCode;
+
+      final response = await ApiClient.dio.get(
+        "/api/categories",
+        queryParameters: {"locale": locale},
+      );
+
+      final List data = response.data;
+
+      categories = List<Map<String, dynamic>>.from(data);
+
+      categoryTopics.clear();
+
+      for (var cat in categories) {
+        categoryTopics[cat["key"]] =
+        List<Map<String, dynamic>>.from(cat["topics"] ?? []);
+      }
+
+      if (categories.isNotEmpty) {
+        selectedCategoryKey = categories.first["key"];
+      }
+    } catch (e) {
+      categories = [];
+      categoryTopics = {};
+    }
+  }
+
+  // ================= COMMUNITIES =================
 
   Future<void> _loadAllCommunities() async {
     try {
@@ -48,6 +94,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("communities")
           .select("*")
           .order("created_at", ascending: false);
+
       allCommunities = List<Map<String, dynamic>>.from(result);
     } catch (_) {
       allCommunities = [];
@@ -65,8 +112,10 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("user_interests")
           .select("interest_name")
           .eq("user_id", user!.id);
-      final interestNames =
-      interests.map((i) => i["interest_name"].toString().toLowerCase()).toList();
+
+      final interestNames = interests
+          .map((i) => i["interest_name"].toString().toLowerCase())
+          .toList();
 
       if (interestNames.isEmpty) {
         recommended = [];
@@ -96,6 +145,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
           .from("user_communities")
           .select("community_id")
           .eq("user_id", user!.id);
+
       final ids = joins.map((j) => j["community_id"]).toList();
 
       if (ids.isEmpty) {
@@ -103,80 +153,77 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         return;
       }
 
-      final comms =
-      await supabase.from("communities").select("*").inFilter("id", ids);
-      userJoinedCommunities = List<Map<String, dynamic>>.from(comms);
+      final comms = await supabase
+          .from("communities")
+          .select("*")
+          .inFilter("id", ids);
+
+      userJoinedCommunities =
+      List<Map<String, dynamic>>.from(comms);
     } catch (_) {
       userJoinedCommunities = [];
     }
   }
 
   bool _isJoined(Map<String, dynamic> community) {
-    return userJoinedCommunities.any((c) => c["id"] == community["id"]);
-  }
-
-  List<Map<String, dynamic>> get filteredRecommended {
-    final joinedIds = userJoinedCommunities.map((c) => c["id"]).toList();
-    return recommended.where((c) => !joinedIds.contains(c["id"])).toList();
+    return userJoinedCommunities
+        .any((c) => c["id"] == community["id"]);
   }
 
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
+
     final currentTopics =
-        getTopicsData(l10n)[selectedCategory]?.map((t) => t.toLowerCase()).toList() ?? [];
+        categoryTopics[selectedCategoryKey]
+            ?.map((t) => t["key"].toString().toLowerCase())
+            .toList() ??
+            [];
 
     return allCommunities.where((c) {
       if (_isJoined(c)) return false;
 
-      final topics = List<String>.from(c["topics"] ?? []).map((t) => t.toLowerCase()).toList();
+      final topics = List<String>.from(c["topics"] ?? [])
+          .map((t) => t.toLowerCase())
+          .toList();
 
-      if (selectedTopic != null && !topics.contains(selectedTopic!.toLowerCase())) return false;
+      if (selectedTopicKey != null &&
+          !topics.contains(selectedTopicKey!.toLowerCase()))
+        return false;
 
-      if (selectedTopic == null && !topics.any((t) => currentTopics.contains(t))) return false;
+      if (selectedTopicKey == null &&
+          !topics.any((t) => currentTopics.contains(t)))
+        return false;
 
       final name = (c["name"] ?? "").toLowerCase();
       final desc = (c["description"] ?? "").toLowerCase();
 
-      return name.contains(q) || desc.contains(q) || q.isEmpty;
+      return name.contains(q) ||
+          desc.contains(q) ||
+          q.isEmpty;
     }).toList();
   }
 
-  Future<void> _joinCommunity(Map<String, dynamic> community) async {
-    if (user == null) return;
-
-    await supabase.from("user_communities").insert({
-      "user_id": user!.id,
-      "community_id": community["id"],
-      "joined_at": DateTime.now().toIso8601String(),
-    });
-
-    await _loadUserJoinedCommunities();
-    setState(() {});
-  }
+  // ================= UI =================
 
   Widget _categoryBar() {
     return SizedBox(
       height: 50,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        children: redditCategories.map((cat) {
-          final selected = selectedCategory == cat;
+        children: categories.map((cat) {
+          final selected =
+              selectedCategoryKey == cat["key"];
+
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: ChoiceChip(
-              label: Text(
-                cat,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.black,
-                ),
-              ),
+              label: Text(cat["name"]),
               selected: selected,
               selectedColor: AppTheme.primary,
-              backgroundColor: Colors.grey.shade200,
               onSelected: (_) {
                 setState(() {
-                  selectedCategory = cat;
-                  selectedTopic = null;
+                  selectedCategoryKey = cat["key"];
+                  selectedTopicKey = null;
                 });
               },
             ),
@@ -187,28 +234,27 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   }
 
   Widget _topicsBar() {
-    final topics = getTopicsData(l10n)[selectedCategory] ?? [];
+    final topics =
+        categoryTopics[selectedCategoryKey] ?? [];
+
     return SizedBox(
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: topics.map((topic) {
-          final selected = selectedTopic?.toLowerCase() == topic.toLowerCase();
+          final selected =
+              selectedTopicKey == topic["key"];
+
           return Padding(
             padding: const EdgeInsets.only(right: 10),
             child: ChoiceChip(
-              label: Text(
-                topic,
-                style: TextStyle(
-                  color: selected ? Colors.white : Colors.black,
-                ),
-              ),
+              label: Text(topic["name"]),
               selected: selected,
               selectedColor: AppTheme.primary,
-              backgroundColor: Colors.grey.shade200,
               onSelected: (_) {
                 setState(() {
-                  selectedTopic = selected ? null : topic;
+                  selectedTopicKey =
+                  selected ? null : topic["key"];
                 });
               },
             ),
@@ -218,117 +264,21 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     );
   }
 
-
-
-
-  Widget _recommendedCard(BuildContext context, Map<String, dynamic> community) {
-    final joined = _isJoined(community);
-    return SizedBox(
-      width: 300,
-      child: Card(
-        surfaceTintColor: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-                  backgroundImage: community["avatar_url"] != null
-                      ? NetworkImage(community["avatar_url"])
-                      : null,
-                  child: community["avatar_url"] == null
-                      ? Icon(Icons.groups, color: Theme.of(context).colorScheme.onSurfaceVariant)
-                      : null,
-                ),
-                title: Text(community["name"] ?? "", style: Theme.of(context).textTheme.titleMedium),
-              ),
-              Text(
-                community["description"] ?? "",
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const Spacer(),
-              Align(
-                alignment: Alignment.centerRight,
-                child: joined
-                    ? FilledButton.tonal(
-                  onPressed: null,
-                  child: const Text("Katıldın"),
-                )
-                    : FilledButton(
-                  onPressed: () => _joinCommunity(community),
-                  style: ButtonStyle(
-                    backgroundColor: MaterialStateProperty.all(AppTheme.primary),
-                    foregroundColor: MaterialStateProperty.all(Colors.white),
-                  ),
-                  child: const Text("Katıl"),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _communityCard(BuildContext context, Map<String, dynamic> community) {
-    final joined = _isJoined(community);
-    return Card(
-      surfaceTintColor: Colors.transparent,
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
-          backgroundImage: community["avatar_url"] != null
-              ? NetworkImage(community["avatar_url"])
-              : null,
-          child: community["avatar_url"] == null
-              ? Icon(Icons.groups, color: Theme.of(context).colorScheme.onSurfaceVariant)
-              : null,
-        ),
-        title: Text(community["name"] ?? ""),
-        subtitle: Text(
-          community["description"] ?? "",
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: joined
-            ? FilledButton.tonal(
-          onPressed: null,
-          child: const Text("Katıldın"),
-        )
-            : FilledButton(
-          onPressed: () => _joinCommunity(community),
-          style: ButtonStyle(
-            backgroundColor: MaterialStateProperty.all(AppTheme.primary),
-            foregroundColor: MaterialStateProperty.all(Colors.white),
-          ),
-          child: const Text("Katıl"),
-        ),
-      ),
-    );
-  }
+  // ================= BUILD =================
 
   @override
   Widget build(BuildContext context) {
-    l10n = AppLocalizations.of(context)!;
-    redditCategories = getTopicsData(l10n).keys.toList();
-
-    if (selectedCategory.isEmpty && redditCategories.isNotEmpty) {
-      selectedCategory = redditCategories.first;
-    }
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
         title: TextField(
-          onChanged: (v) => setState(() => searchQuery = v),
-          decoration: const InputDecoration(
-            hintText: "Topluluk ara",
+          onChanged: (v) =>
+              setState(() => searchQuery = v),
+          decoration: InputDecoration(
+            hintText: l10n.search,
             border: InputBorder.none,
-            prefixIcon: Icon(Icons.search),
+            prefixIcon: const Icon(Icons.search),
           ),
         ),
       ),
@@ -338,28 +288,26 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         padding: const EdgeInsets.all(12),
         child: ListView(
           children: [
-            Text("Konuya göre toplulukları keşfet", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 14),
             _categoryBar(),
             const SizedBox(height: 10),
             _topicsBar(),
-            const SizedBox(height: 24),
-            Text("Senin için önerilen", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 200,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: filteredRecommended.map((c) => _recommendedCard(context, c)).toList(),
-              ),
-            ),
-            const SizedBox(height: 25),
-            Text("Tüm topluluklar", style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 10),
-            ..._filteredCommunities().map((c) => _communityCard(context, c)).toList(),
+            const SizedBox(height: 20),
+            ..._filteredCommunities()
+                .map((c) => ListTile(
+              title:
+              Text(c["name"] ?? ""),
+              subtitle: Text(
+                  c["description"] ?? ""),
+            ))
+                .toList(),
           ],
         ),
       ),
     );
   }
 }
+
+
+
+
+

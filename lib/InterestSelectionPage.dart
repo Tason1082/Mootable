@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 import 'home/home_page.dart';
 import 'login_page.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'community/topic_data.dart';
+import '../l10n/category_model.dart';
+import '../l10n/category_service.dart';
 
 class InterestSelectionPage extends StatefulWidget {
   final List<String>? initialSelected;
@@ -16,15 +16,11 @@ class InterestSelectionPage extends StatefulWidget {
 }
 
 class _InterestSelectionPageState extends State<InterestSelectionPage> {
-  late Map<String, List<String>> categories;
-  final Set<String> selected = {};
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // topic_data.dart'tan lokalizasyon ile kategorileri alıyoruz
-    categories = getTopicsData(AppLocalizations.of(context)!);
-  }
+  late Future<List<CategoryModel>> _categoriesFuture;
+  final CategoryService _categoryService = CategoryService();
+
+  final Set<String> selected = {};
 
   @override
   void initState() {
@@ -32,6 +28,13 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
     if (widget.initialSelected != null) {
       selected.addAll(widget.initialSelected!);
     }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final locale = Localizations.localeOf(context).languageCode;
+    _categoriesFuture = _categoryService.getCategories(locale);
   }
 
   void _toggleSelection(String tag) {
@@ -46,16 +49,15 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
 
   Future<void> _onContinue() async {
     if (selected.isEmpty) return;
+
     try {
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception("Kullanıcı oturumu bulunamadı");
 
-      // Eski kayıtları sil
       await supabase.from('user_interests').delete().eq('user_id', user.id);
 
-      // Yeni ilgi alanlarını ekle
-      final List<Map<String, dynamic>> rows = selected.map((interest) {
+      final rows = selected.map((interest) {
         return {
           'user_id': user.id,
           'interest_name': interest,
@@ -65,7 +67,6 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
 
       await supabase.from('user_interests').insert(rows);
 
-      // HomePage'e yönlendir
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -80,44 +81,36 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
     }
   }
 
-  Widget _buildCategory(String title, List<String> tags) {
-    final l10n = AppLocalizations.of(context)!;
-
+  Widget _buildCategory(CategoryModel category) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              if (title == l10n.category_travel)
-                const Icon(Icons.public, size: 20)
-              else if (title == l10n.category_qa)
-                const Icon(Icons.edit, size: 20)
-              else
-                const Icon(Icons.insert_emoticon, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-            ],
+          Text(
+            category.name,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: tags.map((tag) {
-              final isSelected = selected.contains(tag);
+            children: category.topics.map((topic) {
+              final isSelected = selected.contains(topic.name);
+
               return FilterChip(
-                label: Text(tag),
+                label: Text(topic.name),
                 selected: isSelected,
-                onSelected: (_) => _toggleSelection(tag),
-                selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-                checkmarkColor: Theme.of(context).colorScheme.primary,
+                onSelected: (_) => _toggleSelection(topic.name),
+                selectedColor:
+                Theme.of(context).colorScheme.primary.withOpacity(0.12),
+                checkmarkColor:
+                Theme.of(context).colorScheme.primary,
                 backgroundColor: Colors.grey.shade200,
                 labelStyle: TextStyle(
-                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.black87,
+                  color: isSelected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.black87,
                 ),
               );
             }).toList(),
@@ -142,41 +135,43 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
       },
       child: Scaffold(
         appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginPage()),
-              );
-            },
-          ),
           title: Text(l10n.interest_selection_title),
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  children: [
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        l10n.select_at_least_one_topic,
-                        style: const TextStyle(fontSize: 14, color: Colors.black54),
-                      ),
+        body: FutureBuilder<List<CategoryModel>>(
+          future: _categoriesFuture,
+          builder: (context, snapshot) {
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return const Center(child: Text("Bir hata oluştu"));
+            }
+
+            final categories = snapshot.data!;
+
+            return SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 100),
+                children: [
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      l10n.select_at_least_one_topic,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.black54),
                     ),
-                    const SizedBox(height: 12),
-                    for (final entry in categories.entries)
-                      _buildCategory(entry.key, entry.value),
-                    const SizedBox(height: 80),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  ...categories.map((category) =>
+                      _buildCategory(category)).toList(),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
         bottomNavigationBar: SafeArea(
           minimum: const EdgeInsets.all(16),
@@ -184,13 +179,6 @@ class _InterestSelectionPageState extends State<InterestSelectionPage> {
             height: 56,
             child: ElevatedButton(
               onPressed: canContinue ? _onContinue : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: canContinue ? null : Colors.grey.shade300,
-                foregroundColor: canContinue ? null : Colors.grey.shade700,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
               child: Text(
                 canContinue
                     ? "${l10n.continue_text} (${selected.length})"

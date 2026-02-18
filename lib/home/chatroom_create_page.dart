@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-
-import '../community/topic_data.dart';
-
+import '../core/api_client.dart';
 
 
 class ChatRoomCreatePage extends StatefulWidget {
@@ -17,18 +14,54 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
   bool saveRoom = false;
   bool privateMode = false;
 
-  /// Seçilen topic'ler
-  final Set<String> selectedTopics = {};
+  bool loading = true;
+
+  /// Backend’den gelen kategoriler
+  List<Map<String, dynamic>> categories = [];
+
+  /// Seçilen topic key'leri
+  final Set<String> selectedTopicKeys = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final locale =
+          Localizations.localeOf(context).languageCode;
+
+      final response = await ApiClient.dio.get(
+        "/api/categories",
+        queryParameters: {"locale": locale},
+      );
+
+      setState(() {
+        categories =
+        List<Map<String, dynamic>>.from(response.data);
+        loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        categories = [];
+        loading = false;
+      });
+    }
+  }
+
+
+  /// Tüm topic’leri tek liste yapıyoruz
+  List<Map<String, dynamic>> get allTopics {
+    return categories
+        .expand((cat) =>
+    List<Map<String, dynamic>>.from(cat["topics"] ?? []))
+        .toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-
-    /// 🔥 topic_data.dart içindeki TÜM topic’ler
-    final Map<String, List<String>> topicMap = getTopicsData(l10n);
-    final List<String> allTopics =
-    topicMap.values.expand((list) => list).toList();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -36,10 +69,14 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+        padding:
+        const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
             /// TITLE
             const Text(
@@ -52,12 +89,16 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
 
             const SizedBox(height: 24),
 
-            /// VISIBILITY DROPDOWN
+            /// VISIBILITY
             DropdownButtonFormField<String>(
               value: visibility,
               items: const [
-                DropdownMenuItem(value: "Herkes", child: Text("Herkes")),
-                DropdownMenuItem(value: "Takipçiler", child: Text("Takipçiler")),
+                DropdownMenuItem(
+                    value: "Herkes",
+                    child: Text("Herkes")),
+                DropdownMenuItem(
+                    value: "Takipçiler",
+                    child: Text("Takipçiler")),
               ],
               onChanged: (value) {
                 setState(() {
@@ -66,16 +107,18 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
               },
               decoration: InputDecoration(
                 contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius:
+                  BorderRadius.circular(30),
                 ),
               ),
             ),
 
             const SizedBox(height: 24),
 
-            /// QUESTION
             const Text(
               "Nelerden bahsetmek istiyorsun?",
               style: TextStyle(
@@ -86,7 +129,6 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
 
             const SizedBox(height: 24),
 
-            /// TOPIC TITLE
             const Text(
               "Konu seç",
               style: TextStyle(
@@ -97,40 +139,52 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
 
             const SizedBox(height: 16),
 
-            /// 🔥 TÜM TOPIC’LER (YAN YANA + SCROLL)
+            /// 🔥 BACKEND TOPIC LISTESİ
             Expanded(
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
-                  children: allTopics.map((topic) {
-                    final bool isSelected =
-                    selectedTopics.contains(topic);
+                  children:
+                  allTopics.map((topic) {
+                    final key =
+                    topic["key"].toString();
+                    final name =
+                    topic["name"].toString();
+
+                    final isSelected =
+                    selectedTopicKeys
+                        .contains(key);
 
                     return ChoiceChip(
-                      label: Text(topic),
+                      label: Text(name),
                       selected: isSelected,
                       onSelected: (_) {
                         setState(() {
                           if (isSelected) {
-                            selectedTopics.remove(topic);
+                            selectedTopicKeys
+                                .remove(key);
                           } else {
-                            selectedTopics.add(topic);
+                            selectedTopicKeys
+                                .add(key);
                           }
                         });
                       },
-                      selectedColor: Colors.blue.shade50,
+                      selectedColor:
+                      Colors.blue.shade50,
                       labelStyle: TextStyle(
                         color: isSelected
                             ? Colors.blue
                             : Colors.black,
-                        fontWeight: FontWeight.w600,
+                        fontWeight:
+                        FontWeight.w600,
                       ),
                       shape: StadiumBorder(
                         side: BorderSide(
                           color: isSelected
                               ? Colors.blue
-                              : Colors.grey.shade300,
+                              : Colors.grey
+                              .shade300,
                         ),
                       ),
                     );
@@ -139,7 +193,7 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
               ),
             ),
 
-            /// SAVE ROOM SWITCH
+            /// SAVE ROOM
             _switchTile(
               title: "Sohbet Odasını kaydet",
               value: saveRoom,
@@ -150,7 +204,7 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
               },
             ),
 
-            /// PRIVATE MODE SWITCH
+            /// PRIVATE MODE
             _switchTile(
               title: "Gizli moda izin ver",
               value: privateMode,
@@ -168,8 +222,10 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
               width: double.infinity,
               height: 56,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(30),
-                gradient: const LinearGradient(
+                borderRadius:
+                BorderRadius.circular(30),
+                gradient:
+                const LinearGradient(
                   colors: [
                     Color(0xFF4B5CFF),
                     Color(0xFF8A5CFF),
@@ -177,24 +233,38 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
                 ),
               ),
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                style: ElevatedButton
+                    .styleFrom(
+                  backgroundColor:
+                  Colors.transparent,
+                  shadowColor:
+                  Colors.transparent,
+                  shape:
+                  RoundedRectangleBorder(
+                    borderRadius:
+                    BorderRadius
+                        .circular(30),
                   ),
                 ),
                 onPressed: () {
-                  debugPrint("Visibility: $visibility");
-                  debugPrint("Save Room: $saveRoom");
-                  debugPrint("Private Mode: $privateMode");
-                  debugPrint("Selected Topics: $selectedTopics");
+                  debugPrint(
+                      "Visibility: $visibility");
+                  debugPrint(
+                      "Save Room: $saveRoom");
+                  debugPrint(
+                      "Private Mode: $privateMode");
+                  debugPrint(
+                      "Selected Topic Keys: $selectedTopicKeys");
+
+                  /// 🚀 Burada backend'e gönderilecek olan
+                  /// topic key listesi: selectedTopicKeys
                 },
                 child: const Text(
                   "Sohbet Odanı başlat",
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                    FontWeight.bold,
                   ),
                 ),
               ),
@@ -237,3 +307,4 @@ class _ChatRoomCreatePageState extends State<ChatRoomCreatePage> {
     );
   }
 }
+
