@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'conversation_service.dart';
 import 'message_model.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'signalr_service.dart';
 
 class ChatDetailPage extends StatefulWidget {
   final int conversationId;
-  final String? receiverId; // DM alıcısı
+  final String? receiverId;
 
   const ChatDetailPage({
     super.key,
@@ -19,31 +20,59 @@ class ChatDetailPage extends StatefulWidget {
 
 class _ChatDetailPageState extends State<ChatDetailPage> {
   List<MessageModel> messages = [];
-  final controller = TextEditingController();
-  final scrollController = ScrollController();
+
+  final TextEditingController controller = TextEditingController();
+  final ScrollController scrollController = ScrollController();
+  final FlutterSecureStorage storage = const FlutterSecureStorage();
 
   String? myUserId;
-  final storage = const FlutterSecureStorage();
+  String? token;
 
   @override
   void initState() {
     super.initState();
-    _loadUserId();
+    _initialize();
   }
 
-  // 🔹 Login sonrası saklanan userId'yi al
-  Future<void> _loadUserId() async {
-    final id = await storage.read(key: "userId");
-    setState(() {
-      myUserId = id;
+  Future<void> _initialize() async {
+    myUserId = await storage.read(key: "userId");
+    token = await storage.read(key: "token");
+
+    if (!mounted) return;
+    if (myUserId == null || token == null) return;
+
+    await _loadInitialMessages();
+
+    await SignalRService.connect(token!);
+    await SignalRService.joinConversation(widget.conversationId);
+
+    SignalRService.onMessage((data) {
+      if (!mounted) return;
+      if (data == null || data.isEmpty) return;
+
+      final map = Map<String, dynamic>.from(data.first as Map);
+
+      final incoming = MessageModel.fromJson(map);
+
+      if (incoming.conversationId != widget.conversationId) return;
+
+      final exists = messages.any((m) => m.id == incoming.id);
+      if (exists) return;
+
+      setState(() {
+        messages.add(incoming);
+      });
+
+      _scrollToBottom();
     });
-    _load(); // kullanıcı ID alındıktan sonra mesajları yükle
+
+    setState(() {});
   }
 
-  Future<void> _load() async {
-    if (myUserId == null) return; // ID yoksa yükleme yapma
-
+  Future<void> _loadInitialMessages() async {
     final convo = await ConversationService.get(widget.conversationId);
+
+    if (!mounted) return;
 
     setState(() {
       messages = convo.messages;
@@ -53,31 +82,39 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   }
 
   Future<void> _send() async {
-    if (myUserId == null) return;
-
     final text = controller.text.trim();
     if (text.isEmpty) return;
 
-    await ConversationService.sendMessage(
+    await SignalRService.sendMessage(
       widget.conversationId,
       text,
-      receiverId: widget.receiverId,
     );
 
     controller.clear();
-    _load();
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (scrollController.hasClients) {
-        scrollController.jumpTo(scrollController.position.maxScrollExtent);
-      }
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      if (!scrollController.hasClients) return;
+
+      scrollController.jumpTo(
+        scrollController.position.maxScrollExtent,
+      );
     });
   }
 
   String formatTime(DateTime date) {
-    return "${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}";
+    return "${date.hour.toString().padLeft(2, '0')}:"
+        "${date.minute.toString().padLeft(2, '0')}";
+  }
+
+  @override
+  void dispose() {
+    SignalRService.disconnect();
+    controller.dispose();
+    scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -101,32 +138,48 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 final msg = messages[i];
                 final isMe = msg.senderId == myUserId;
 
-                print("MY ID: $myUserId (${myUserId.runtimeType})");
-                print("SENDER: ${msg.senderId} (${msg.senderId.runtimeType})");
                 return Align(
-                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: isMe
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      maxWidth:
+                      MediaQuery.of(context).size.width * 0.75,
                     ),
                     decoration: BoxDecoration(
-                      color: isMe ? const Color(0xFFDCF8C6) : Colors.grey.shade200,
+                      color: isMe
+                          ? const Color(0xFFDCF8C6)
+                          : Colors.grey.shade200,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(18),
                         topRight: const Radius.circular(18),
-                        bottomLeft: Radius.circular(isMe ? 18 : 4),
-                        bottomRight: Radius.circular(isMe ? 4 : 18),
+                        bottomLeft:
+                        Radius.circular(isMe ? 18 : 4),
+                        bottomRight:
+                        Radius.circular(isMe ? 4 : 18),
                       ),
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment:
+                      CrossAxisAlignment.end,
                       children: [
-                        Text(msg.content, style: const TextStyle(fontSize: 15)),
+                        Text(
+                          msg.content,
+                          style:
+                          const TextStyle(fontSize: 15),
+                        ),
                         const SizedBox(height: 4),
-                        Text(formatTime(msg.createdAt),
-                            style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                        Text(
+                          formatTime(msg.createdAt),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.black54,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -134,10 +187,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               },
             ),
           ),
-
           SafeArea(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 8, vertical: 6),
               child: Row(
                 children: [
                   Expanded(
@@ -147,12 +200,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                         hintText: "Mesaj yaz...",
                         filled: true,
                         fillColor: Colors.grey.shade100,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        contentPadding:
+                        const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10),
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius:
+                          BorderRadius.circular(25),
                           borderSide: BorderSide.none,
                         ),
                       ),
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -160,7 +218,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     radius: 22,
                     backgroundColor: Colors.green,
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: Colors.white),
+                      icon: const Icon(Icons.send,
+                          color: Colors.white),
                       onPressed: _send,
                     ),
                   ),
