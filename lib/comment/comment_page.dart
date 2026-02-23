@@ -33,12 +33,14 @@ class _CommentPageState extends State<CommentPage> {
 
   Future<void> _fetchComments() async {
     try {
-      final res = await ApiClient.dio.get('/api/comments/post/${widget.postId}');
+      final res = await ApiClient.dio
+          .get('/api/comments/post/${widget.postId}');
+
       comments = List<Map<String, dynamic>>.from(res.data);
 
       tree = {};
       for (var c in comments) {
-        final pid = c["parent_id"];
+        final pid = c["parentCommentId"];
         tree.putIfAbsent(pid, () => []);
         tree[pid]!.add(c);
       }
@@ -60,7 +62,7 @@ class _CommentPageState extends State<CommentPage> {
       });
 
       _text.clear();
-      _fetchComments();
+      await _fetchComments();
     } catch (e) {
       print("Yorum eklerken hata: $e");
     }
@@ -84,20 +86,14 @@ class _CommentPageState extends State<CommentPage> {
 
   Future<void> _voteComment(int commentId, int vote) async {
     try {
-      final res = await ApiClient.dio.post(
-        '/api/comments/$commentId/vote',
-        data: { "vote": vote },
+      await ApiClient.dio.post(
+        '/api/comments/$commentId/vote2',
+        data: {
+          "vote": vote,
+        },
       );
 
-      final updated = res.data;
-
-      setState(() {
-        final index = comments.indexWhere((c) => c["id"] == commentId);
-        if (index != -1) {
-          comments[index]["score"] = updated["score"];
-          comments[index]["userVote"] = updated["userVote"];
-        }
-      });
+      await _fetchComments();
 
     } catch (e) {
       print("Oy verirken hata: $e");
@@ -155,7 +151,7 @@ class _CommentPageState extends State<CommentPage> {
 
   Widget _buildComment(Map<String, dynamic> c, int depth) {
     final votes = c["votes"] ?? [];
-    int score = c["score"] ?? 0;
+    int score = c["netScore"] ?? 0;
     int userVote = c["userVote"] ?? 0;
 
     final children = tree[c["id"]] ?? [];

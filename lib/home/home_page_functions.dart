@@ -82,7 +82,7 @@ Future<void> joinCommunity(
 
 
 /// =======================================================
-/// TOGGLE VOTE (API ONLY)
+/// TOGGLE VOTE (API)
 /// =======================================================
 Future<void> toggleVote(HomePageState state, int postId, int vote) async {
   final index = state.posts.indexWhere((p) => p["id"] == postId);
@@ -93,31 +93,30 @@ Future<void> toggleVote(HomePageState state, int postId, int vote) async {
   final previousVote = post["user_vote"] ?? 0;
   final previousCount = post["votes_count"] ?? 0;
 
-  /// optimistic UI
+  // 🔹 sadece local user_vote değişiyor, votes_count backend’den geliyor
   state.setState(() {
     if (previousVote == vote) {
       post["user_vote"] = 0;
-      post["votes_count"] = previousCount - vote;
     } else {
       post["user_vote"] = vote;
-      post["votes_count"] = previousCount - previousVote + vote;
     }
   });
 
   try {
     final res = await ApiClient.dio.post(
       "/api/posts/vote",
-      data: {
-        "postId": postId,
-        "vote": vote,
-      },
+      data: {"postId": postId, "vote": vote},
     );
 
-    post["votes_count"] = res.data["score"];
+    final score = res.data["score"] ?? previousCount;
+
+    state.setState(() {
+      post["votes_count"] = score; // total score her zaman backend’den
+    });
   } catch (_) {
+    // Hata durumunda user_vote geri al
     state.setState(() {
       post["user_vote"] = previousVote;
-      post["votes_count"] = previousCount;
     });
   }
 }
