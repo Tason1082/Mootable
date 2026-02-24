@@ -37,55 +37,30 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        final token = data["token"];
-
-        // token kaydet
-        await _storage.write(key: "token", value: token);
-
-        // JWT decode
-        final decoded = JwtDecoder.decode(token);
-
-        final userId = decoded[
-        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
-        ];
-        final username = decoded["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"];
-        print("LOGIN USER ID SAVED => $userId");
-
-        await _storage.write(key: "userId", value: userId.toString());
-
-
-        print("========= JWT FULL =========");
-        print(decoded);
-        print("===========================");
-
-
-
-
-
-        await _storage.write(key: "userId", value: userId);
-
-        print("LOGIN USER ID SAVED => $userId");
-
-        if (!mounted) return;
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-        );
+      // 🔴 SADECE BAŞARI AYRILIR
+      if (response.statusCode != 200) {
+        ErrorHandler.showError(context, response.statusCode);
+        return;
       }
-      else {
-        final data = jsonDecode(response.body);
 
-        if (!mounted) return;
+      // ✅ SUCCESS
+      final data = jsonDecode(response.body);
+      final token = data["token"];
 
-        ErrorHandler.showError(context, data["message"]);
-      }
+      await _storage.write(key: "token", value: token);
+
+      final decoded = JwtDecoder.decode(token);
+      final userId = decoded[
+      "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"
+      ];
+
+      await _storage.write(key: "userId", value: userId.toString());
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
     } catch (e, st) {
-      if (!mounted) return;
-
       ErrorHandler.showError(context, e, stackTrace: st);
     }
   }
