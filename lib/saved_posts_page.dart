@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:mootable/post/post_card.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'core/api_client.dart';
+import 'package:dio/dio.dart';
+
 class SavedPostsPage extends StatefulWidget {
-  final String userId;
-  const SavedPostsPage({super.key, required this.userId});
+  const SavedPostsPage({super.key});
 
   @override
   State<SavedPostsPage> createState() => _SavedPostsPageState();
 }
 
 class _SavedPostsPageState extends State<SavedPostsPage> {
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   List<Map<String, dynamic>> _savedPosts = [];
   bool _loading = true;
 
-  // ✅ Sayfalama değişkenleri
   int _limit = 15;
   int _offset = 0;
   bool _isLoadingMore = false;
   bool _hasMore = true;
+
   late ScrollController _scrollController;
 
   @override
@@ -27,14 +30,16 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     super.initState();
     _fetchSavedPosts();
     _scrollController = ScrollController();
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent - 200 &&
-          !_isLoadingMore &&
-          _hasMore) {
-        _fetchSavedPosts(loadMore: true);
-      }
-    });
+    _scrollController.addListener(_scrollListener);
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _fetchSavedPosts(loadMore: true);
+    }
   }
 
   @override
@@ -46,99 +51,112 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
   Future<void> _fetchSavedPosts({bool loadMore = false}) async {
     if (_isLoadingMore || (!_hasMore && loadMore)) return;
 
-    if (!loadMore) setState(() => _loading = true);
-    setState(() => _isLoadingMore = true);
-
-    // 🔹 15'er 15'er kaydedilen post ID'lerini çekiyoruz
-    final saves = await Supabase.instance.client
-        .from("saves")
-        .select("post_id")
-        .eq("user_id", widget.userId)
-        .range(_offset, _offset + _limit - 1)
-        .order("id", ascending: false);
-
-    if (saves.isEmpty) {
+    if (!loadMore) {
       setState(() {
-        _hasMore = false;
-        _isLoadingMore = false;
-        _loading = false;
+        _loading = true;
+        _offset = 0;
+        _hasMore = true;
       });
-      return;
     }
 
-    List<Map<String, dynamic>> posts = [];
+    setState(() => _isLoadingMore = true);
 
-    for (var save in saves) {
-      final post = await Supabase.instance.client
-          .from("posts")
-          .select("id, content, image_url, created_at, user_id")
-          .eq("id", save["post_id"])
-          .maybeSingle();
+    try {
+      final token = await _storage.read(key: "jwt_token");
 
-      if (post != null) {
-        final profile = await Supabase.instance.client
-            .from("profiles")
-            .select("username, avatar_url")
-            .eq("id", post["user_id"])
-            .maybeSingle();
-        posts.add({...post, "profiles": profile});
+      final response = await ApiClient.dio.get(
+        "/api/posts/save/me",
+        queryParameters: {
+          "limit": _limit,
+          "offset": _offset,
+        },
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      final List data = response.data;
+
+      if (data.isEmpty) {
+        _hasMore = false;
+      } else {
+        final newPosts = List<Map<String, dynamic>>.from(data);
+
+        if (loadMore) {
+          _savedPosts.addAll(newPosts);
+        } else {
+          _savedPosts = newPosts;
+        }
+
+        _offset += _limit;
       }
+    } catch (e) {
+      debugPrint("SavedPosts fetch error: $e");
     }
 
     setState(() {
-      if (loadMore) {
-        _savedPosts.addAll(posts);
-      } else {
-        _savedPosts = posts;
-      }
-      _offset += _limit;
-      _isLoadingMore = false;
       _loading = false;
+      _isLoadingMore = false;
     });
   }
 
   bool _isVideo(String url) {
-    final lowerUrl = url.toLowerCase();
-    return lowerUrl.endsWith('.mp4') ||
-        lowerUrl.endsWith('.mov') ||
-        lowerUrl.endsWith('.avi') ||
-        lowerUrl.endsWith('.mkv') ||
-        lowerUrl.endsWith('.webm');
+    final lower = url.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.mkv') ||
+        lower.endsWith('.webm');
   }
 
-  Widget _buildThumbnail(String? imageUrl) {
-    if (imageUrl == null || imageUrl.isEmpty) {
+  Widget _buildThumbnail(String? mediaUrl) {
+    if (mediaUrl == null || mediaUrl.isEmpty) {
       return Container(
         color: Colors.grey[200],
         child: const Icon(Icons.image_not_supported, color: Colors.grey),
       );
     }
 
-    if (_isVideo(imageUrl)) {
+    if (_isVideo(mediaUrl)) {
       return Stack(
         fit: StackFit.expand,
         children: [
-          // Küçük video önizlemesi
-          _VideoThumbnail(videoUrl: imageUrl),
+          _VideoThumbnail(videoUrl: mediaUrl),
           const Center(
-            child: Icon(Icons.play_circle_fill,
-                color: Colors.white70, size: 36),
+            child: Icon(
+              Icons.play_circle_fill,
+              color: Colors.white70,
+              size: 36,
+            ),
           ),
         ],
       );
-    } else {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) =>
-        const Icon(Icons.broken_image, color: Colors.grey),
-      );
+    }
+
+    return Image.network(
+      mediaUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+      const Icon(Icons.broken_image, color: Colors.grey),
+    );
+  }
+
+  // Grid içindeki PostCard toggle save durumunu güncelle
+  void _updatePostSavedState(int postId, bool isSaved) {
+    final index = _savedPosts.indexWhere((p) => p["id"] == postId);
+    if (index != -1) {
+      setState(() {
+        _savedPosts[index]["is_saved"] = isSaved;
+        if (!isSaved) {
+          // eğer kaydı kaldırıldıysa grid’den de silebiliriz
+          _savedPosts.removeAt(index);
+        }
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+
     return Scaffold(
       appBar: AppBar(title: Text(l10n.saved_posts_title)),
       body: _loading
@@ -156,53 +174,58 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
           padding: const EdgeInsets.all(4),
           gridDelegate:
           const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3, // ✅ 3 sütun
+            crossAxisCount: 3,
             crossAxisSpacing: 4,
             mainAxisSpacing: 4,
           ),
-          itemCount: _savedPosts.length + 1,
+          itemCount: _savedPosts.length + (_hasMore ? 1 : 0),
           itemBuilder: (context, index) {
             if (index == _savedPosts.length) {
-              if (_hasMore) {
-                return const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              } else {
-                return const SizedBox.shrink();
-              }
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
             }
 
             final post = _savedPosts[index];
-            final imageUrl = post["image_url"];
+            final mediaUrl = post["image_url"];
+
             return GestureDetector(
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => DraggableScrollableSheet(
-                      initialChildSize: 0.95,
-                      builder: (_, controller) => Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => DraggableScrollableSheet(
+                    initialChildSize: 0.95,
+                    builder: (_, controller) => Container(
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(20),
                         ),
-                        child: SingleChildScrollView(
-                          controller: controller,
-                          child: PostCard(
-                            post: post,
-                            showActions: true, // ister kapat
-                          ),
+                      ),
+                      child: SingleChildScrollView(
+                        controller: controller,
+                        child: PostCard(
+                          post: post,
+                          parentContext: context,
+                          onVote: (postId, vote) {
+                            // opsiyonel: burada oy işlemi handle edilebilir
+                          },
+                          onJoinCommunity: (communityName, index) {
+                            // opsiyonel: topluluğa katılma
+                          },
+
                         ),
                       ),
                     ),
-                  );
-                },
-
-            child: ClipRRect(
+                  ),
+                );
+              },
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: _buildThumbnail(imageUrl),
+                child: _buildThumbnail(mediaUrl),
               ),
             );
           },
@@ -212,7 +235,6 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
   }
 }
 
-// 🔹 Küçük video thumbnail (önizleme) için sessiz video widget
 class _VideoThumbnail extends StatefulWidget {
   final String videoUrl;
   const _VideoThumbnail({required this.videoUrl});
@@ -230,9 +252,10 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
       ..initialize().then((_) {
-        _controller.setVolume(0);
-        _controller.play();
-        _controller.setLooping(true);
+        _controller
+          ..setVolume(0)
+          ..setLooping(true)
+          ..play();
         setState(() => _initialized = true);
       });
   }
@@ -250,85 +273,3 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
         : Container(color: Colors.grey[300]);
   }
 }
-
-// 🔹 Tam video oynatma widget (diyalog içinde)
-class _VideoPlayerWidget extends StatefulWidget {
-  final String videoUrl;
-  const _VideoPlayerWidget({required this.videoUrl});
-
-  @override
-  State<_VideoPlayerWidget> createState() => _VideoPlayerWidgetState();
-}
-
-class _VideoPlayerWidgetState extends State<_VideoPlayerWidget> {
-  late VideoPlayerController _controller;
-  bool _initialized = false;
-  bool _muted = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize().then((_) {
-        _controller.setVolume(0.0);
-        setState(() => _initialized = true);
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _toggleMute() {
-    setState(() {
-      _muted = !_muted;
-      _controller.setVolume(_muted ? 0.0 : 1.0);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_initialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return AspectRatio(
-      aspectRatio: _controller.value.aspectRatio,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          VideoPlayer(_controller),
-          IconButton(
-            icon: Icon(
-              _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-              color: Colors.white,
-              size: 40,
-            ),
-            onPressed: () {
-              setState(() {
-                _controller.value.isPlaying
-                    ? _controller.pause()
-                    : _controller.play();
-              });
-            },
-          ),
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: IconButton(
-              icon: Icon(
-                _muted ? Icons.volume_off : Icons.volume_up,
-                color: Colors.white,
-                size: 28,
-              ),
-              onPressed: _toggleMute,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-

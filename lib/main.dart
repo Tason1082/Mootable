@@ -7,6 +7,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/api_client.dart';
 import 'splash_page.dart';
 import 'error_handler.dart';
 
@@ -22,7 +23,7 @@ Future<void> main() async {
         autoRefreshToken: true,
       ),
     );
-
+    ApiClient.allowSelfSignedCerts();
     FlutterError.onError = (FlutterErrorDetails details) {
       if (kReleaseMode) {
         ErrorHandler.logError(

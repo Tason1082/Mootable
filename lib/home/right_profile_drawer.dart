@@ -101,8 +101,7 @@ class RightProfileDrawer extends StatelessWidget {
                   Navigator.of(context, rootNavigator: true).push(
                     MaterialPageRoute(
                       builder: (_) => SavedPostsPage(
-                        userId:
-                        Supabase.instance.client.auth.currentUser!.id,
+
                       ),
                     ),
                   );

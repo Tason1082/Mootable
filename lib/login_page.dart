@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decoder/jwt_decoder.dart';
 
+import 'core/api_client.dart';
 import 'core/api_config.dart';
 import 'signup_page.dart';
 import 'error_handler.dart';
@@ -26,25 +27,28 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     try {
-      final response = await http.post(
-        Uri.parse("${ApiConfig.baseUrl}/api/auth/login"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
+      // 1️⃣ Self-signed sertifikayı kabul et
+      ApiClient.allowSelfSignedCerts();
+
+      // 2️⃣ POST isteğini dio ile yap
+      final response = await ApiClient.dio.post(
+        '/api/auth/login',
+        data: {
           "email": _emailController.text.trim(),
           "password": _passwordController.text.trim(),
-        }),
+        },
       );
 
       if (!mounted) return;
 
-      // 🔴 SADECE BAŞARI AYRILIR
+      // 3️⃣ Hata kontrolü
       if (response.statusCode != 200) {
         ErrorHandler.showError(context, response.statusCode);
         return;
       }
 
-      // ✅ SUCCESS
-      final data = jsonDecode(response.body);
+      // 4️⃣ Başarılı ise token al
+      final data = response.data;
       final token = data["token"];
 
       await _storage.write(key: "token", value: token);
@@ -56,6 +60,7 @@ class _LoginPageState extends State<LoginPage> {
 
       await _storage.write(key: "userId", value: userId.toString());
 
+      // 5️⃣ HomePage’e yönlendir
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -64,7 +69,6 @@ class _LoginPageState extends State<LoginPage> {
       ErrorHandler.showError(context, e, stackTrace: st);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;

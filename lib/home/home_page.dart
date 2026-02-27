@@ -2,31 +2,24 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:video_player/video_player.dart';
-import '../community/community_explore_page.dart';
-import '../error_handler.dart';
-import '../login_page.dart';
-import '../comment/comment_page.dart';
-import '../post/post_page.dart';
-import '../quote_post_page.dart';
-import '../user_posts_page.dart';
-import '../saved_posts_page.dart';
 import '../TimeAgo.dart';
-import 'dart:typed_data' as typed_data;
-import 'package:video_thumbnail/video_thumbnail.dart';
+import '../error_handler.dart';
+import '../comment/comment_page.dart';
+import '../post/post_card.dart';
+import '../quote_post_page.dart';
 import '../video_player_widget.dart';
+import '../community/community_explore_page.dart';
 import '../community/CreateCommunityPage.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import '../edit_profile_page.dart';
 import '../settings_page.dart';
-
-// YENİ MENÜ DOSYALARI
+import '../post/post_page.dart';
+import '../user_posts_page.dart';
+import '../saved_posts_page.dart';
+import 'home_page_functions.dart';
 import 'left_menu.dart';
 import 'right_profile_drawer.dart';
 
-// 🔹 Fonksiyonları import ediyoruz
-import 'home_page_functions.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -74,6 +67,7 @@ class HomePageState extends State<HomePage> {
     _scrollController.dispose();
     super.dispose();
   }
+
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
 
@@ -109,9 +103,7 @@ class HomePageState extends State<HomePage> {
       final fileName =
           "${user!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg";
 
-      await Supabase.instance.client.storage
-          .from('avatars')
-          .upload(fileName, file);
+      await Supabase.instance.client.storage.from('avatars').upload(fileName, file);
 
       final publicUrl = Supabase.instance.client.storage
           .from('avatars')
@@ -128,48 +120,14 @@ class HomePageState extends State<HomePage> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Profil fotoğrafı güncellendi"),
-          ),
+          const SnackBar(content: Text("Profil fotoğrafı güncellendi")),
         );
       }
-    }  catch (e, st) {
-  if (!mounted) return;
-  ErrorHandler.showError(context, e, stackTrace: st);
-  }
-
-}
-  Widget _buildMediaWidget(String url) {
-    final uri = Uri.parse(url);
-    final path = uri.path.toLowerCase(); // ?token kısmını kaldırıyoruz
-
-    if (path.endsWith(".mp4") || path.endsWith(".mov") || path.endsWith(".avi") || path.endsWith(".webm")) {
-      return AspectRatio(
-        aspectRatio: 1,
-        child: VideoPlayerWidget(videoUrl: url),
-      );
+    } catch (e, st) {
+      if (!mounted) return;
+      ErrorHandler.showError(context, e, stackTrace: st);
     }
-
-    if (path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".png") || path.endsWith(".gif")) {
-      return Image.network(
-        url,
-        width: double.infinity,
-        height: 200,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          print("Resim yüklenemedi: $error");
-          return const Center(child: Icon(Icons.broken_image));
-        },
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: Theme.of(context).colorScheme.surfaceVariant,
-      child: const Center(child: Text("Desteklenmeyen medya türü")),
-    );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -178,7 +136,6 @@ class HomePageState extends State<HomePage> {
 
     return Scaffold(
       key: scaffoldKey,
-
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -197,17 +154,15 @@ class HomePageState extends State<HomePage> {
               child: CircleAvatar(
                 radius: 18,
                 backgroundColor: colors.surfaceVariant,
-                backgroundImage:
-                profileImageUrl != null ? NetworkImage(profileImageUrl!) : null,
-                child: profileImageUrl == null
-                    ? const Icon(Icons.person)
+                backgroundImage: profileImageUrl != null
+                    ? NetworkImage(profileImageUrl!)
                     : null,
+                child: profileImageUrl == null ? const Icon(Icons.person) : null,
               ),
             ),
           ),
         ],
       ),
-
       endDrawer: RightProfileDrawer(
         profileImageUrl: profileImageUrl,
         username: username,
@@ -215,7 +170,6 @@ class HomePageState extends State<HomePage> {
         onUploadProfileImage: _uploadProfileImage,
         refreshProfile: _fetchUserProfile,
       ),
-
       body: loading && posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -234,120 +188,17 @@ class HomePageState extends State<HomePage> {
             }
 
             final post = posts[index];
-            final postId = post["id"];
-            final isSaved = post["is_saved"] == true;
-            return Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
 
-                  ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: colors.surfaceVariant,
-                      child: Icon(Icons.groups, color: colors.onSurfaceVariant),
-                    ),
-                    title: Text(
-                      post["community"] ?? "",
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      post["createdAt"] != null
-                          ? TimeAgo.format(context, DateTime.parse(post["created_at"]))
-                          : "",
-                    ),
-
-                    trailing: post["is_member"] != true
-                        ? TextButton(
-                      onPressed: () => joinCommunity(this, post["community"], index),
-                      child: const Text("Katıl"),
-                    )
-                        : null,
-                  ),
-
-                  if (post["imageUrl"] != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: _buildMediaWidget(post["imageUrl"]),
-                    ),
-
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Text(
-                      post["content"] ?? "",
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.arrow_upward,
-                            color: post["user_vote"] == 1 ? colors.primary : colors.onSurfaceVariant,
-                          ),
-                          onPressed: () => toggleVote(this, postId, 1),
-                        ),
-                        Text("${post["votes_count"] ?? 0}"),
-                        IconButton(
-                          icon: Icon(
-                            Icons.arrow_downward,
-                            color: post["user_vote"] == -1 ? colors.error : colors.onSurfaceVariant,
-                          ),
-                          onPressed: () => toggleVote(this, postId, -1),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.comment_outlined),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => CommentPage(postId: postId),
-                              ),
-                            );
-                          },
-                        ),
-                        Text("${post["comment_count"] ?? 0}"),
-                        const Spacer(),
-
-                        // Alıntı Yap Butonu sadece görünür
-                        IconButton(
-                          icon: const Icon(Icons.repeat),
-                          onPressed: () {Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => QuotePostPage(post: post),
-                            ),
-                          );}, // şimdilik boş
-                        ),
-
-                        IconButton(
-                          icon: Icon(
-                            isSaved ? Icons.bookmark : Icons.bookmark_border,
-                            color: isSaved ? colors.secondary : colors.onSurfaceVariant,
-                          ),
-                          onPressed: () => toggleSave(this, postId, isSaved),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            return PostCard(
+              post: post,
+              parentContext: context,
+              onVote: (postId, vote) => toggleVote(this, postId, vote),
+              onJoinCommunity: (communityName, index) =>
+                  joinCommunity(this, communityName, index),
             );
-
-
           },
         ),
       ),
-
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: (index) => onItemTapped(this, index),
