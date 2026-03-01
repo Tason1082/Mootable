@@ -10,35 +10,36 @@ class SavedPostsPage extends StatefulWidget {
   const SavedPostsPage({super.key});
 
   @override
-  State<SavedPostsPage> createState() => _SavedPostsPageState();
+  State<SavedPostsPage> createState() => SavedPostsPageState();
 }
 
-class _SavedPostsPageState extends State<SavedPostsPage> {
+class SavedPostsPageState extends State<SavedPostsPage> {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  List<Map<String, dynamic>> _savedPosts = [];
-  bool _loading = true;
 
-  int _limit = 15;
-  int _offset = 0;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
+  List<Map<String, dynamic>> posts = [];
+  bool loading = true;
 
-  late ScrollController _scrollController;
+  int limit = 6;
+  int offset = 0;
+  bool isLoadingMore = false;
+  bool hasMore = true;
+
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    _fetchSavedPosts();
-    _scrollController = ScrollController();
-    _scrollController.addListener(_scrollListener);
+    fetchSavedPosts();
+    _scrollController = ScrollController()
+      ..addListener(_scrollListener);
   }
 
   void _scrollListener() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200 &&
-        !_isLoadingMore &&
-        _hasMore) {
-      _fetchSavedPosts(loadMore: true);
+        !isLoadingMore &&
+        hasMore) {
+      fetchSavedPosts(loadMore: true);
     }
   }
 
@@ -48,18 +49,19 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     super.dispose();
   }
 
-  Future<void> _fetchSavedPosts({bool loadMore = false}) async {
-    if (_isLoadingMore || (!_hasMore && loadMore)) return;
+  Future<void> fetchSavedPosts({bool loadMore = false}) async {
+    if (isLoadingMore) return;
+    if (!hasMore && loadMore) return;
 
     if (!loadMore) {
       setState(() {
-        _loading = true;
-        _offset = 0;
-        _hasMore = true;
+        loading = true;
+        offset = 0;
+        hasMore = true;
       });
     }
 
-    setState(() => _isLoadingMore = true);
+    setState(() => isLoadingMore = true);
 
     try {
       final token = await _storage.read(key: "jwt_token");
@@ -67,34 +69,41 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
       final response = await ApiClient.dio.get(
         "/api/posts/save/me",
         queryParameters: {
-          "limit": _limit,
-          "offset": _offset,
+          "limit": limit,
+          "offset": offset,
         },
-        options: Options(headers: {"Authorization": "Bearer $token"}),
+        options: Options(
+          headers: {"Authorization": "Bearer $token"},
+        ),
       );
 
       final List data = response.data;
 
+      if (!mounted) return;
+
       if (data.isEmpty) {
-        _hasMore = false;
+        hasMore = false;
       } else {
         final newPosts = List<Map<String, dynamic>>.from(data);
 
-        if (loadMore) {
-          _savedPosts.addAll(newPosts);
-        } else {
-          _savedPosts = newPosts;
-        }
-
-        _offset += _limit;
+        setState(() {
+          if (loadMore) {
+            posts.addAll(newPosts);
+          } else {
+            posts = newPosts;
+          }
+          offset += limit;
+        });
       }
     } catch (e) {
       debugPrint("SavedPosts fetch error: $e");
     }
 
+    if (!mounted) return;
+
     setState(() {
-      _loading = false;
-      _isLoadingMore = false;
+      loading = false;
+      isLoadingMore = false;
     });
   }
 
@@ -139,37 +148,26 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     );
   }
 
-  // Grid içindeki PostCard toggle save durumunu güncelle
-  void _updatePostSavedState(int postId, bool isSaved) {
-    final index = _savedPosts.indexWhere((p) => p["id"] == postId);
-    if (index != -1) {
-      setState(() {
-        _savedPosts[index]["is_saved"] = isSaved;
-        if (!isSaved) {
-          // eğer kaydı kaldırıldıysa grid’den de silebiliriz
-          _savedPosts.removeAt(index);
-        }
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.saved_posts_title)),
-      body: _loading
+      appBar: AppBar(
+        title: Text(l10n.saved_posts_title),
+      ),
+      body: loading && posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
-          : _savedPosts.isEmpty
-          ? Center(child: Text(l10n.no_saved_posts))
           : RefreshIndicator(
-        onRefresh: () async {
-          _offset = 0;
-          _hasMore = true;
-          await _fetchSavedPosts();
-        },
-        child: GridView.builder(
+        onRefresh: () => fetchSavedPosts(),
+        child: posts.isEmpty
+            ? ListView(
+          children: [
+            const SizedBox(height: 200),
+            Center(child: Text(l10n.no_saved_posts)),
+          ],
+        )
+            : GridView.builder(
           controller: _scrollController,
           padding: const EdgeInsets.all(4),
           gridDelegate:
@@ -178,47 +176,30 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
             crossAxisSpacing: 4,
             mainAxisSpacing: 4,
           ),
-          itemCount: _savedPosts.length + (_hasMore ? 1 : 0),
+          itemCount: posts.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
-            if (index == _savedPosts.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
+            if (index >= posts.length) {
+              return isLoadingMore
+                  ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+                  : const SizedBox.shrink();
             }
 
-            final post = _savedPosts[index];
-            final mediaUrl = post["image_url"];
+            final post = posts[index];
+            final mediaUrl = post["imageUrl"];
 
             return GestureDetector(
               onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => DraggableScrollableSheet(
-                    initialChildSize: 0.95,
-                    builder: (_, controller) => Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
-                      ),
-                      child: SingleChildScrollView(
-                        controller: controller,
-                        child: PostCard(
-                          post: post,
-                          parentContext: context,
-                          onVote: (postId, vote) {
-                            // opsiyonel: burada oy işlemi handle edilebilir
-                          },
-                          onJoinCommunity: (communityName, index) {
-                            // opsiyonel: topluluğa katılma
-                          },
-
-                        ),
-                      ),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SavedPostsViewer(
+                      posts: posts,
+                      initialIndex: index,
                     ),
                   ),
                 );
@@ -234,9 +215,68 @@ class _SavedPostsPageState extends State<SavedPostsPage> {
     );
   }
 }
+class SavedPostsViewer extends StatefulWidget {
+  final List<Map<String, dynamic>> posts;
+  final int initialIndex;
+
+  const SavedPostsViewer({
+    super.key,
+    required this.posts,
+    required this.initialIndex,
+  });
+
+  @override
+  State<SavedPostsViewer> createState() => _SavedPostsViewerState();
+}
+
+class _SavedPostsViewerState extends State<SavedPostsViewer> {
+  late final ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+
+    // Tıklanan posttan başlat
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final offset = widget.initialIndex * 500.0;
+      _scrollController.jumpTo(offset);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Saved Posts"),
+      ),
+      body: ListView.builder(
+        controller: _scrollController,
+        itemCount: widget.posts.length,
+        itemBuilder: (context, index) {
+          final post = widget.posts[index];
+
+          return PostCard(
+            post: post,
+            parentContext: context,
+            onVote: (postId, vote) {},
+            onJoinCommunity: (communityName, index) {},
+          );
+        },
+      ),
+    );
+  }
+}
 
 class _VideoThumbnail extends StatefulWidget {
   final String videoUrl;
+
   const _VideoThumbnail({required this.videoUrl});
 
   @override
@@ -245,18 +285,20 @@ class _VideoThumbnail extends StatefulWidget {
 
 class _VideoThumbnailState extends State<_VideoThumbnail> {
   late VideoPlayerController _controller;
-  bool _initialized = false;
+  bool initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+    _controller =
+    VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
       ..initialize().then((_) {
+        if (!mounted) return;
         _controller
           ..setVolume(0)
           ..setLooping(true)
           ..play();
-        setState(() => _initialized = true);
+        setState(() => initialized = true);
       });
   }
 
@@ -268,8 +310,15 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
 
   @override
   Widget build(BuildContext context) {
-    return _initialized
-        ? VideoPlayer(_controller)
+    return initialized
+        ? FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: _controller.value.size.width,
+        height: _controller.value.size.height,
+        child: VideoPlayer(_controller),
+      ),
+    )
         : Container(color: Colors.grey[300]);
   }
 }
