@@ -1,4 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiConfig {
-  // Android Emulator için localhost
-  static const String baseUrl = "https://10.0.2.2:7016";
+  static String get baseUrl => dotenv.env['BASE_URL'] ?? '';
 }
