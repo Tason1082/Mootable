@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../community/CreateCommunityPage.dart';
 import '../my_community/my_community_page.dart';
-import 'chat_room.dart';
+import '../voice/chat_room.dart';
 
 void openLeftSideSheet(BuildContext context) {
   showGeneralDialog(
