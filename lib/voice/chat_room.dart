@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mootable/voice/voice_room_page.dart';
 import 'package:mootable/voice/voice_service.dart';
 
 class ChatRoomPage extends StatelessWidget {
@@ -37,8 +38,61 @@ class ChatRoomPage extends StatelessWidget {
   }
 }
 
-class LinkGirView extends StatelessWidget {
+class LinkGirView extends StatefulWidget {
   const LinkGirView({super.key});
+
+  @override
+  State<LinkGirView> createState() => _LinkGirViewState();
+}
+
+class _LinkGirViewState extends State<LinkGirView> {
+  final TextEditingController _controller = TextEditingController();
+
+  List<dynamic> joinedRooms = [];
+  bool loading = false;
+  bool fetchingRooms = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadJoinedRooms();
+  }
+
+  Future<void> _loadJoinedRooms() async {
+    setState(() => fetchingRooms = true);
+    try {
+      final rooms = await VoiceService.getJoinedRooms();
+      setState(() => joinedRooms = rooms);
+    } catch (e) {
+      debugPrint("Joined rooms yükleme hatası: $e");
+    }
+    setState(() => fetchingRooms = false);
+  }
+
+  Future<void> joinRoom() async {
+    final code = _controller.text.trim();
+    if (code.isEmpty) return;
+
+    setState(() => loading = true);
+
+    try {
+      final roomId = await VoiceService.joinByInvite(code);
+      _controller.clear();
+
+      // Katıldığın odaları yeniden yükle
+      await _loadJoinedRooms();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Odaya katıldın!")),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Geçersiz davet kodu")),
+      );
+    }
+
+    setState(() => loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,18 +100,95 @@ class LinkGirView extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
+
+          /// LINK INPUT
           TextField(
+            controller: _controller,
             decoration: InputDecoration(
-              hintText: "Linki buraya yapıştır",
+              hintText: "Davet kodunu yapıştır",
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: () {},
-            child: const Text("Katıl"),
+
+          const SizedBox(height: 15),
+
+          /// KATIL BUTONU
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: loading ? null : joinRoom,
+              child: loading
+                  ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+                  : const Text("Katıl"),
+            ),
+          ),
+
+          const SizedBox(height: 25),
+
+          /// ALTTA KATILDIĞI ODALAR
+          Expanded(
+            child: fetchingRooms
+                ? const Center(child: CircularProgressIndicator())
+                : joinedRooms.isEmpty
+                ? const Center(child: Text("Henüz katıldığın oda yok"))
+                : GridView.builder(
+              itemCount: joinedRooms.length,
+              gridDelegate:
+              const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemBuilder: (context, index) {
+                final room = joinedRooms[index];
+                final roomId = room["id"];
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4B5CFF),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              VoiceRoomPage(roomId: roomId),
+                        ),
+                      );
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.mic,
+                          color: Colors.white,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "Oda $roomId",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -190,11 +321,16 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
 
                 return InkWell(
                   onTap: () {
-                    final roomId = room["id"];
-                    debugPrint("Girilen oda: $roomId");
 
-                    // Burada voice call sayfasına geçebilirsin
-                    // Navigator.push(...)
+                    final roomId = room["id"];
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VoiceRoomPage(roomId: roomId),
+                      ),
+                    );
+
                   },
                   child: Container(
                     decoration: BoxDecoration(
