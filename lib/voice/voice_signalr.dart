@@ -1,120 +1,95 @@
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
-/// ==============================================
-/// WebRTC Sesli Arama Servisi
-/// ==============================================
-class WebVoiceService {
-  RTCPeerConnection? peerConnection;
-  MediaStream? localStream;
-
-  final Map<String, dynamic> configuration = {
-    "iceServers": [
-      {"urls": "stun:stun.l.google.com:19302"}
-    ]
-  };
-
-  /// 🔹 WebRTC başlat
-  Future<void> init() async {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      "audio": true,
-      "video": false,
-    });
-
-    peerConnection = await createPeerConnection(configuration);
-
-    localStream!.getTracks().forEach((track) {
-      peerConnection!.addTrack(track, localStream!);
-    });
-  }
-
-  /// 🔹 Teklif oluştur
-  Future<String?> createOffer() async {
-    if (peerConnection == null) return null;
-
-    RTCSessionDescription offer = await peerConnection!.createOffer();
-    await peerConnection!.setLocalDescription(offer);
-    return offer.sdp;
-  }
-
-  /// 🔹 Uzak SDP ayarla
-  Future<void> setRemote(String sdp, String type) async {
-    if (peerConnection == null) return;
-
-    RTCSessionDescription desc = RTCSessionDescription(sdp, type);
-    await peerConnection!.setRemoteDescription(desc);
-  }
-
-  /// 🔹 Cevap oluştur
-  Future<String?> createAnswer() async {
-    if (peerConnection == null) return null;
-
-    RTCSessionDescription answer = await peerConnection!.createAnswer();
-    await peerConnection!.setLocalDescription(answer);
-    return answer.sdp;
-  }
-}
-
-/// ==============================================
-/// SignalR Sesli Arama Servisi
-/// ==============================================
-typedef OnOfferCallback = void Function(String userId, String offer);
-typedef OnAnswerCallback = void Function(String userId, String answer);
-typedef OnIceCallback = void Function(String userId, String candidate);
-
 class VoiceSignalR {
+
   late HubConnection connection;
 
-  OnOfferCallback? onOffer;
-  OnAnswerCallback? onAnswer;
-  OnIceCallback? onIce;
+  /// EVENTS
+  Function(String roomId, String offer, String userId)? onOffer;
+  Function(String roomId, String answer, String userId)? onAnswer;
+  Function(String roomId, String candidate, String userId, String sdpMid, int sdpIndex)? onIce;
 
-  /// 🔹 SignalR bağlantısı başlat
-  Future<void> connect(String url) async {
-    connection = HubConnectionBuilder().withUrl(url).build();
+  Future<void> connect() async {
 
-    // Eventleri tanımla
+    connection = HubConnectionBuilder()
+        .withUrl("http://10.0.2.2:5004/voicehub")
+        .withAutomaticReconnect()
+        .build();
+
+    /// OFFER
     connection.on("ReceiveOffer", (args) {
-      if (args == null || args.length < 2) return;
-      final userId = args[0] as String;
+
+      if (args == null) return;
+
+      final roomId = args[0] as String;
       final offer = args[1] as String;
-      onOffer?.call(userId, offer);
+      final userId = args[2] as String;
+
+      onOffer?.call(roomId, offer, userId);
     });
 
+    /// ANSWER
     connection.on("ReceiveAnswer", (args) {
-      if (args == null || args.length < 2) return;
-      final userId = args[0] as String;
+
+      if (args == null) return;
+
+      final roomId = args[0] as String;
       final answer = args[1] as String;
-      onAnswer?.call(userId, answer);
+      final userId = args[2] as String;
+
+      onAnswer?.call(roomId, answer, userId);
     });
 
+    /// ICE
     connection.on("ReceiveIceCandidate", (args) {
-      if (args == null || args.length < 2) return;
-      final userId = args[0] as String;
+
+      if (args == null) return;
+
+      final roomId = args[0] as String;
       final candidate = args[1] as String;
-      onIce?.call(userId, candidate);
+      final userId = args[2] as String;
+      final sdpMid = args[3] as String;
+      final sdpIndex = args[4] as int;
+
+      onIce?.call(roomId, candidate, userId, sdpMid, sdpIndex);
     });
 
     await connection.start();
   }
 
-  /// 🔹 Odaya katıl
-  Future<void> joinRoom(String roomId) async {
+  Future joinRoom(String roomId) async {
     await connection.invoke("JoinRoom", args: [roomId]);
   }
 
-  /// 🔹 Teklif gönder
-  Future<void> sendOffer(String roomId, String offer, String userId) async {
-    await connection.invoke("SendOffer", args: [roomId, offer, userId]);
+  Future sendOffer(String roomId, String offer, String userId) async {
+    await connection.invoke(
+      "SendOffer",
+      args: [roomId, offer, userId],
+    );
   }
 
-  /// 🔹 Cevap gönder
-  Future<void> sendAnswer(String roomId, String answer, String userId) async {
-    await connection.invoke("SendAnswer", args: [roomId, answer, userId]);
+  Future sendAnswer(String roomId, String answer, String userId) async {
+    await connection.invoke(
+      "SendAnswer",
+      args: [roomId, answer, userId],
+    );
   }
 
-  /// 🔹 ICE candidate gönder
-  Future<void> sendIce(String roomId, String candidate) async {
-    await connection.invoke("SendIceCandidate", args: [roomId, candidate]);
+  Future sendIce(
+      String roomId,
+      String candidate,
+      String userId,
+      String sdpMid,
+      int sdpIndex,
+      ) async {
+
+    await connection.invoke(
+      "SendIceCandidate",
+      args: [roomId, candidate, userId, sdpMid, sdpIndex],
+    );
+  }
+
+  Future disconnect() async {
+    await connection.stop();
   }
 }
