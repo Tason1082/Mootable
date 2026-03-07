@@ -1,10 +1,12 @@
 import 'package:signalr_netcore/signalr_client.dart';
 
+import '../core/auth_service.dart';
+
+
 class VoiceSignalR {
 
   late HubConnection connection;
 
-  /// EVENTS
   Function(String roomId, String offer, String userId)? onOffer;
   Function(String roomId, String answer, String userId)? onAnswer;
   Function(String roomId, String candidate, String userId, String sdpMid, int sdpIndex)? onIce;
@@ -12,7 +14,15 @@ class VoiceSignalR {
   Future<void> connect() async {
 
     connection = HubConnectionBuilder()
-        .withUrl("http://10.0.2.2:5004/voicehub")
+        .withUrl(
+      "http://10.0.2.2:5004/voicehub",
+      options: HttpConnectionOptions(
+        accessTokenFactory: () async {
+          final token = await AuthService.getToken();
+          return token ?? "";
+        },
+      ),
+    )
         .withAutomaticReconnect()
         .build();
 
@@ -54,6 +64,7 @@ class VoiceSignalR {
       onIce?.call(roomId, candidate, userId, sdpMid, sdpIndex);
     });
 
+    /// bağlantıyı başlat
     await connection.start();
   }
 
@@ -62,17 +73,11 @@ class VoiceSignalR {
   }
 
   Future sendOffer(String roomId, String offer, String userId) async {
-    await connection.invoke(
-      "SendOffer",
-      args: [roomId, offer, userId],
-    );
+    await connection.invoke("SendOffer", args: [roomId, offer, userId]);
   }
 
   Future sendAnswer(String roomId, String answer, String userId) async {
-    await connection.invoke(
-      "SendAnswer",
-      args: [roomId, answer, userId],
-    );
+    await connection.invoke("SendAnswer", args: [roomId, answer, userId]);
   }
 
   Future sendIce(
@@ -80,8 +85,7 @@ class VoiceSignalR {
       String candidate,
       String userId,
       String sdpMid,
-      int sdpIndex,
-      ) async {
+      int sdpIndex) async {
 
     await connection.invoke(
       "SendIceCandidate",
