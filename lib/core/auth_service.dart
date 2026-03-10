@@ -10,19 +10,18 @@ class AuthService {
   }
 
   static Future<String?> getUserId() async {
-
     final token = await getToken();
-
     if (token == null) return null;
 
     final parts = token.split('.');
-
     if (parts.length != 3) return null;
 
     final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
-
     final Map<String, dynamic> data = jsonDecode(payload);
-    print(data);
-    return data["sub"]?.toString() ?? data["userId"]?.toString();
+
+    print("JWT PAYLOAD -> $data");
+
+    // Yeni key: WS nameidentifier
+    return data["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]?.toString();
   }
 }

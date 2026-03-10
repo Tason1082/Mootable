@@ -1,162 +1,165 @@
-import 'dart:convert';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:mootable/voice/peer_state.dart';
 
 class WebRTCVoiceService {
-  final Map<String, RTCPeerConnection> peers = {};
-  MediaStream? localStream;
+  MediaStream? _localStream;
 
-  final Map<String, List<RTCIceCandidate>> pendingIce = {};
-  final Map<String, bool> localOfferSent = {}; // ✅ local offer durumu
-
-  Function(
-      String userId,
-      String candidate,
-      String sdpMid,
-      int sdpIndex,
-      )? onIceCandidate;
+  final Map<String, RTCPeerConnection> _peers = {};
+  final Map<String, List<RTCIceCandidate>> _iceQueue = {};
+  final Map<String, PeerState> _peerStates = {};
 
   Function(String userId, MediaStream stream)? onRemoteStream;
+  Function(String userId, String candidate, String mid, int index)? onIceCandidate;
+  Function(String userId, String sdp)? onAnswerCreated; // ⚡ callback eklendi
 
-  final Map<String, dynamic> configuration = {
+  Map<String, RTCPeerConnection> get peerConnections => _peers;
+
+  final Map<String, dynamic> _config = {
     "iceServers": [
-      {"urls": "stun:stun.l.google.com:19302"},
-      {
-        "urls": "turn:TURN_SERVER_IP:3478",
-        "username": "user",
-        "credential": "pass"
-      }
+      {"urls": "stun:stun.l.google.com:19302"}
     ]
   };
 
-  /// local offer gönderilip gönderilmediğini kontrol eder
-  bool hasLocalOffer(String userId) => localOfferSent[userId] ?? false;
-
+  /// Local stream ve speakerphone init
   Future<void> init() async {
-    localStream = await navigator.mediaDevices.getUserMedia({
+    await Helper.setSpeakerphoneOn(true);
+    _localStream = await navigator.mediaDevices.getUserMedia({
       "audio": true,
       "video": false,
     });
   }
 
-  Future<RTCPeerConnection> createPeer(String userId) async {
-    if (peers.containsKey(userId)) {
-      return peers[userId]!;
-    }
+  bool hasPeer(String userId) => _peers.containsKey(userId);
 
-    RTCPeerConnection pc = await createPeerConnection(configuration);
+  /// Peer oluştur
+  Future<RTCPeerConnection> createPeer(String userId, {required bool polite}) async {
+    if (hasPeer(userId)) return _peers[userId]!;
 
-    for (var track in localStream!.getTracks()) {
-      pc.addTrack(track, localStream!);
-    }
+    await Helper.setSpeakerphoneOn(true);
 
-    pc.onTrack = (event) {
-      if (event.streams.isNotEmpty) {
-        onRemoteStream?.call(userId, event.streams.first);
+    final pc = await createPeerConnection(_config);
+
+    _peers[userId] = pc;
+    _peerStates[userId] = PeerState(polite);
+
+    // Local audio stream ekle
+    if (_localStream != null) {
+      for (var track in _localStream!.getAudioTracks()) {
+        pc.addTrack(track, _localStream!);
       }
-    };
+    }
 
+    // ICE candidate oluştuğunda
     pc.onIceCandidate = (candidate) {
-      if (candidate.candidate != null) {
-        onIceCandidate?.call(
-          userId,
-          candidate.candidate!,
-          candidate.sdpMid ?? "",
-          candidate.sdpMLineIndex ?? 0,
-        );
-      }
+      if (candidate == null) return;
+      onIceCandidate?.call(
+        userId,
+        candidate.candidate!,
+        candidate.sdpMid!,
+        candidate.sdpMLineIndex!,
+      );
     };
 
-    peers[userId] = pc;
+    // Remote audio geldiğinde
+    pc.onTrack = (event) {
+      if (event.track.kind != "audio") return;
+      if (event.streams.isEmpty) return;
+      final stream = event.streams.first;
+      onRemoteStream?.call(userId, stream);
+    };
 
-    /// Eğer ICE candidate peer oluşmadan geldiyse ekle
-    if (pendingIce.containsKey(userId)) {
-      for (var ice in pendingIce[userId]!) {
+    // Önceden gelen ICE candidate’lar varsa ekle
+    if (_iceQueue.containsKey(userId)) {
+      for (var ice in _iceQueue[userId]!) {
         pc.addCandidate(ice);
       }
-      pendingIce.remove(userId);
+      _iceQueue.remove(userId);
     }
 
     return pc;
   }
 
+  /// Offer oluştur
   Future<String> createOffer(String userId) async {
-    RTCPeerConnection pc = await createPeer(userId);
+    final pc = _peers[userId]!;
+    final state = _peerStates[userId]!;
 
-    RTCSessionDescription offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-
-    localOfferSent[userId] = true; // ✅ Offer gönderildi işaretle
-
-    return jsonEncode({
-      "sdp": offer.sdp,
-      "type": offer.type,
-    });
+    state.makingOffer = true;
+    try {
+      final offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      return offer.sdp!;
+    } finally {
+      state.makingOffer = false;
+    }
   }
 
+  /// Answer oluştur
   Future<String> createAnswer(String userId) async {
-    RTCPeerConnection pc = peers[userId]!;
-
-    RTCSessionDescription answer = await pc.createAnswer();
+    final pc = _peers[userId]!;
+    final answer = await pc.createAnswer({"offerToReceiveAudio": true});
     await pc.setLocalDescription(answer);
-
-    return jsonEncode({
-      "sdp": answer.sdp,
-      "type": answer.type,
-    });
+    return answer.sdp!;
   }
 
-  Future<void> setRemote(String userId, String data) async {
-    final json = jsonDecode(data);
+  /// Offer handle
+  Future<void> handleOffer(String userId, String sdp) async {
+    final pc = _peers[userId]!;
+    final state = _peerStates[userId]!;
 
-    RTCPeerConnection pc = peers[userId] ?? await createPeer(userId);
+    final offer = RTCSessionDescription(sdp, "offer");
 
-    RTCSessionDescription desc =
-    RTCSessionDescription(json["sdp"], json["type"]);
+    final offerCollision =
+        state.makingOffer || pc.signalingState != RTCSignalingState.RTCSignalingStateStable;
+    state.ignoreOffer = !state.polite && offerCollision;
 
-    // Eğer local offer zaten gönderildiyse ve remote offer gelirse ignore et
-    if (desc.type == "offer" && hasLocalOffer(userId)) {
-      print("Local offer var, gelen remote offer ignored -> $userId");
+    if (state.ignoreOffer) return;
+
+    await pc.setRemoteDescription(offer);
+
+    // Answer oluştur ve callback ile SignalR’a gönder
+    final answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    onAnswerCreated?.call(userId, answer.sdp!); // ⚡ burada answer gönderilecek
+  }
+
+  /// Answer handle
+  Future<void> handleAnswer(String userId, String sdp) async {
+    final pc = _peers[userId]!;
+    final answer = RTCSessionDescription(sdp, "answer");
+    await pc.setRemoteDescription(answer);
+  }
+
+  /// ICE ekle
+  Future<void> addIce(String userId, String candidate, String mid, int index) async {
+    final ice = RTCIceCandidate(candidate, mid, index);
+
+    if (!hasPeer(userId)) {
+      _iceQueue.putIfAbsent(userId, () => []).add(ice);
       return;
     }
 
-    await pc.setRemoteDescription(desc);
+    await _peers[userId]!.addCandidate(ice);
   }
 
-  Future<void> addIce(
-      String userId,
-      String candidate,
-      String sdpMid,
-      int sdpIndex,
-      ) async {
-    RTCIceCandidate ice = RTCIceCandidate(candidate, sdpMid, sdpIndex);
-
-    if (!peers.containsKey(userId)) {
-      pendingIce.putIfAbsent(userId, () => []);
-      pendingIce[userId]!.add(ice);
-      return;
-    }
-
-    await peers[userId]!.addCandidate(ice);
-  }
-
+  /// Microphone toggle
   void toggleMic(bool enabled) {
-    for (var track in localStream!.getAudioTracks()) {
+    if (_localStream == null) return;
+    for (var track in _localStream!.getAudioTracks()) {
       track.enabled = enabled;
     }
   }
 
+  /// Dispose
   Future<void> dispose() async {
-    for (var pc in peers.values) {
+    for (var pc in _peers.values) {
       await pc.close();
     }
+    _peers.clear();
 
-    peers.clear();
-    localOfferSent.clear();
-
-    for (var track in localStream?.getTracks() ?? []) {
-      await track.stop();
+    if (_localStream != null) {
+      for (var track in _localStream!.getTracks()) track.stop();
+      await _localStream!.dispose();
     }
-
-    await localStream?.dispose();
   }
 }

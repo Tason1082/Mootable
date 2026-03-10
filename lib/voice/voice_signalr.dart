@@ -1,21 +1,22 @@
-import 'package:signalr_netcore/signalr_client.dart';
+import 'dart:async';
 
+import 'package:signalr_netcore/signalr_client.dart';
 import '../core/auth_service.dart';
 
-
 class VoiceSignalR {
-
   late HubConnection connection;
 
+  // Callbacks
   Function(String roomId, String offer, String userId)? onOffer;
   Function(String roomId, String answer, String userId)? onAnswer;
   Function(String roomId, String candidate, String userId, String sdpMid, int sdpIndex)? onIce;
+  Function(String connectionId)? onUserJoined;
 
-  Future<void> connect() async {
-
+  /// Bağlantıyı başlat (retry + timeout destekli)
+  Future<void> connect({int retries = 3, Duration timeout = const Duration(seconds: 10)}) async {
     connection = HubConnectionBuilder()
         .withUrl(
-      "http://10.0.2.2:5004/voicehub",
+      "http://192.168.1.156:5004/voicehub",
       options: HttpConnectionOptions(
         accessTokenFactory: () async {
           final token = await AuthService.getToken();
@@ -26,74 +27,87 @@ class VoiceSignalR {
         .withAutomaticReconnect()
         .build();
 
-    /// OFFER
+    // SignalR eventleri
     connection.on("ReceiveOffer", (args) {
-
-      if (args == null) return;
-
-      final roomId = args[0] as String;
-      final offer = args[1] as String;
-      final userId = args[2] as String;
-
-      onOffer?.call(roomId, offer, userId);
+      if (args == null || args.length < 3) return;
+      onOffer?.call(args[0].toString(), args[1].toString(), args[2].toString());
     });
 
-    /// ANSWER
     connection.on("ReceiveAnswer", (args) {
-
-      if (args == null) return;
-
-      final roomId = args[0] as String;
-      final answer = args[1] as String;
-      final userId = args[2] as String;
-
-      onAnswer?.call(roomId, answer, userId);
+      if (args == null || args.length < 3) return;
+      onAnswer?.call(args[0].toString(), args[1].toString(), args[2].toString());
     });
 
-    /// ICE
     connection.on("ReceiveIceCandidate", (args) {
-
-      if (args == null) return;
-
-      final roomId = args[0] as String;
-      final candidate = args[1] as String;
-      final userId = args[2] as String;
-      final sdpMid = args[3] as String;
-      final sdpIndex = args[4] as int;
-
-      onIce?.call(roomId, candidate, userId, sdpMid, sdpIndex);
+      if (args == null || args.length < 5) return;
+      onIce?.call(
+        args[0].toString(),
+        args[1].toString(),
+        args[2].toString(),
+        args[3].toString(),
+        args[4] as int,
+      );
     });
 
-    /// bağlantıyı başlat
-    await connection.start();
+    connection.on("UserJoined", (args) {
+      if (args == null || args.isEmpty) return;
+      onUserJoined?.call(args[0].toString());
+    });
+
+    connection.onreconnecting(({Exception? error}) {
+      print("[SignalR] Reconnecting -> $error");
+    });
+
+    connection.onreconnected(({String? connectionId}) {
+      print("[SignalR] Reconnected -> $connectionId");
+    });
+
+    connection.onclose(({Exception? error}) {
+      print("[SignalR] Connection closed -> $error");
+    });
+
+    // Retry ve timeout ile bağlantı başlat
+    int attempt = 0;
+    while (attempt < retries) {
+      attempt++;
+      try {
+        await connection.start()?.timeout(timeout);
+        print("[SignalR] Connected on attempt $attempt");
+        return;
+      } on TimeoutException catch (_) {
+        print("[SignalR] Timeout on attempt $attempt, retrying...");
+        if (attempt == retries) rethrow;
+      } catch (e) {
+        print("[SignalR] Connection error: $e");
+        rethrow;
+      }
+    }
   }
 
-  Future joinRoom(String roomId) async {
-    await connection.invoke("JoinRoom", args: [roomId]);
+  /// Odaya katıl (timeout destekli)
+  Future<void> joinRoom(String roomId, {Duration timeout = const Duration(seconds: 10)}) async {
+    await connection.invoke("JoinRoom", args: [roomId]).timeout(timeout);
   }
 
-  Future sendOffer(String roomId, String offer, String userId) async {
-    await connection.invoke("SendOffer", args: [roomId, offer, userId]);
+  /// Offer gönder
+  Future<void> sendOffer(String roomId, String offer, {Duration timeout = const Duration(seconds: 10)}) async {
+    await connection.invoke("SendOffer", args: [roomId, offer]).timeout(timeout);
   }
 
-  Future sendAnswer(String roomId, String answer, String userId) async {
-    await connection.invoke("SendAnswer", args: [roomId, answer, userId]);
+  /// Answer gönder
+  Future<void> sendAnswer(String roomId, String answer, {Duration timeout = const Duration(seconds: 10)}) async {
+    await connection.invoke("SendAnswer", args: [roomId, answer]).timeout(timeout);
   }
 
-  Future sendIce(
-      String roomId,
-      String candidate,
-      String userId,
-      String sdpMid,
-      int sdpIndex) async {
-
-    await connection.invoke(
-      "SendIceCandidate",
-      args: [roomId, candidate, userId, sdpMid, sdpIndex],
-    );
+  /// ICE gönder
+  Future<void> sendIce(String roomId, String candidate, String sdpMid, int sdpIndex,
+      {Duration timeout = const Duration(seconds: 10)}) async {
+    await connection.invoke("SendIceCandidate", args: [roomId, candidate, sdpMid, sdpIndex])
+        .timeout(timeout);
   }
 
-  Future disconnect() async {
+  /// Bağlantıyı kapat
+  Future<void> disconnect() async {
     await connection.stop();
   }
 }
