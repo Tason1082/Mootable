@@ -141,26 +141,28 @@ class _PostCardState extends State<PostCard> {
             ),
           );
         },
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Image.memory(
-              videoThumbnail!,
-              width: double.infinity,
-              height: 200,
-              fit: BoxFit.cover,
-            ),
-            Container(
-              decoration: const BoxDecoration(
-                color: Colors.black45,
-                shape: BoxShape.circle,
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Image.memory(
+                videoThumbnail!,
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
-              child: const Padding(
-                padding: EdgeInsets.all(8.0),
-                child: Icon(Icons.play_arrow, color: Colors.white, size: 40),
+              Container(
+                decoration: const BoxDecoration(
+                  color: Colors.black45,
+                  shape: BoxShape.circle,
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Icon(Icons.play_arrow, color: Colors.white, size: 40),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -169,14 +171,16 @@ class _PostCardState extends State<PostCard> {
         path.endsWith(".jpeg") ||
         path.endsWith(".png") ||
         path.endsWith(".gif")) {
-      return Image.network(
-        url,
-        width: double.infinity,
-        height: 200,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) {
-          return const Center(child: Icon(Icons.broken_image));
-        },
+      return AspectRatio(
+        aspectRatio: 7 / 8,
+        child: Image.network(
+          url,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return const Center(child: Icon(Icons.broken_image));
+          },
+        ),
       );
     }
 
@@ -194,15 +198,12 @@ class _PostCardState extends State<PostCard> {
     final post = widget.post;
     final postId = post["id"];
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Container(
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colors.surfaceVariant,
@@ -210,14 +211,17 @@ class _PostCardState extends State<PostCard> {
             ),
             title: Text(
               post["community"] ?? "",
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
               post["created_at"] != null
                   ? TimeAgo.format(
-                  widget.parentContext, DateTime.parse(post["created_at"]))
+                widget.parentContext,
+                DateTime.parse(post["created_at"]),
+              )
                   : "",
             ),
             trailing: post["is_member"] != true
@@ -228,18 +232,18 @@ class _PostCardState extends State<PostCard> {
             )
                 : null,
           ),
+
           if (post["imageUrl"] != null || post["image_url"] != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: _buildMediaWidget(post["imageUrl"] ?? post["image_url"]),
-            ),
+            _buildMediaWidget(post["imageUrl"] ?? post["image_url"]),
+
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               post["content"] ?? "",
               style: theme.textTheme.bodyMedium,
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Row(
@@ -254,6 +258,7 @@ class _PostCardState extends State<PostCard> {
                   onPressed: () => widget.onVote?.call(postId, 1),
                 ),
                 Text("${post["votes_count"] ?? 0}"),
+
                 IconButton(
                   icon: Icon(
                     Icons.arrow_downward,
@@ -263,7 +268,9 @@ class _PostCardState extends State<PostCard> {
                   ),
                   onPressed: () => widget.onVote?.call(postId, -1),
                 ),
+
                 const SizedBox(width: 8),
+
                 IconButton(
                   icon: const Icon(Icons.comment_outlined),
                   onPressed: () {
@@ -276,7 +283,9 @@ class _PostCardState extends State<PostCard> {
                   },
                 ),
                 Text("${post["comment_count"] ?? 0}"),
+
                 const Spacer(),
+
                 IconButton(
                   icon: const Icon(Icons.repeat),
                   onPressed: () {
@@ -288,6 +297,7 @@ class _PostCardState extends State<PostCard> {
                     );
                   },
                 ),
+
                 _loadingSaved
                     ? const SizedBox(
                   width: 24,
@@ -306,6 +316,8 @@ class _PostCardState extends State<PostCard> {
               ],
             ),
           ),
+
+          const Divider(height: 1), // Instagram tarzı post ayırıcı çizgi
         ],
       ),
     );

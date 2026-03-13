@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'home/home_page.dart';
-import 'login_page.dart';
+import 'core/login_page.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../l10n/category_model.dart';
 import '../l10n/category_service.dart';

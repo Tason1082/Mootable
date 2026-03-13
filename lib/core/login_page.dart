@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:mootable/core/register_page.dart';
 
-import 'core/api_client.dart';
-import 'core/api_config.dart';
-import 'signup_page.dart';
-import 'error_handler.dart';
-import 'home/home_page.dart';
+import 'api_client.dart';
+import 'api_config.dart';
+
+import '../error_handler.dart';
+import '../home/home_page.dart';
 
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -118,7 +119,7 @@ class _LoginPageState extends State<LoginPage> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const SignUpPage()),
+                    MaterialPageRoute(builder: (_) => const RegisterPage()),
                   );
                 },
                 child: Text(
