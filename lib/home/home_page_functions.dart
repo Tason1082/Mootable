@@ -32,7 +32,8 @@ Future<void> fetchPosts(HomePageState state, {bool loadMore = false}) async {
     final posts = raw.map((p) {
       return {
         ...p, // Backend'den gelen her şey aynen kalsın
-
+        "votes_count": p["netScore"] ?? 0,
+        "user_vote": p["userVote"] ?? 0,
         // Sadece tarih ve community için mapping
         "created_at": p["createdAt"],
         "community_name": p["community"],
