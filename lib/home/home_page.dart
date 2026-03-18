@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../TimeAgo.dart';
 import '../error_handler.dart';
 import '../comment/comment_page.dart';
@@ -164,11 +165,7 @@ class HomePageState extends State<HomePage> {
         ],
       ),
       endDrawer: RightProfileDrawer(
-        profileImageUrl: profileImageUrl,
-        username: username,
-        bio: bio,
-        onUploadProfileImage: _uploadProfileImage,
-        refreshProfile: _fetchUserProfile,
+        refreshProfile: _fetchUserProfile, // artık sadece refreshProfile var
       ),
       body: loading && posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
@@ -178,6 +175,7 @@ class HomePageState extends State<HomePage> {
           controller: _scrollController,
           itemCount: posts.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            // Eğer index posts.length'den büyükse, yükleme göstergesi
             if (index >= posts.length) {
               return isLoadingMore
                   ? const Padding(
@@ -186,7 +184,6 @@ class HomePageState extends State<HomePage> {
               )
                   : const SizedBox.shrink();
             }
-
             final post = posts[index];
 
             return PostCard(

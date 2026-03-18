@@ -24,4 +24,7 @@ class AuthService {
     // Yeni key: WS nameidentifier
     return data["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier"]?.toString();
   }
+  static Future<void> logout() async {
+    await _storage.delete(key: "token");
+  }
 }

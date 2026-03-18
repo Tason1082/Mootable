@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/api_client.dart';
 import '../theme/app_theme.dart';
@@ -12,9 +11,6 @@ class CommunityExplorePage extends StatefulWidget {
 }
 
 class _CommunityExplorePageState extends State<CommunityExplorePage> {
-  final supabase = Supabase.instance.client;
-  final user = Supabase.instance.client.auth.currentUser;
-
   bool loading = true;
   bool _categoriesLoaded = false;
 
@@ -47,19 +43,34 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     await Future.wait([
       _loadCategoriesFromApi(),
       _loadAllCommunities(),
-      _loadUserInterestsAndRecommended(),
+      _loadRecommended(),
       _loadUserJoinedCommunities(),
     ]);
 
     setState(() => loading = false);
   }
 
+  // ================= JOIN =================
+
+  Future<void> _joinCommunity(String id) async {
+    try {
+      await ApiClient.dio.post("/api/communities/$id/join");
+
+      final joined = allCommunities.firstWhere((c) => c["id"] == id);
+
+      setState(() {
+        userJoinedCommunities.add(joined);
+      });
+    } catch (e) {
+      print("Join error: $e");
+    }
+  }
+
   // ================= CATEGORY API =================
 
   Future<void> _loadCategoriesFromApi() async {
     try {
-      final locale =
-          Localizations.localeOf(context).languageCode;
+      final locale = Localizations.localeOf(context).languageCode;
 
       final response = await ApiClient.dio.get(
         "/api/categories",
@@ -90,116 +101,49 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
 
   Future<void> _loadAllCommunities() async {
     try {
-      final result = await supabase
-          .from("communities")
-          .select("*")
-          .order("created_at", ascending: false);
+      final response = await ApiClient.dio.get("/api/communities");
 
-      allCommunities = List<Map<String, dynamic>>.from(result);
+      allCommunities = List<Map<String, dynamic>>.from(response.data);
     } catch (_) {
       allCommunities = [];
     }
   }
 
-  Future<void> _loadUserInterestsAndRecommended() async {
-    if (user == null) {
-      recommended = [];
-      return;
-    }
-
+  Future<void> _loadRecommended() async {
     try {
-      final interests = await supabase
-          .from("user_interests")
-          .select("interest_name")
-          .eq("user_id", user!.id);
+      final response =
+      await ApiClient.dio.get("/api/communities/recommended");
 
-      final interestNames = interests
-          .map((i) => i["interest_name"].toString().toLowerCase())
-          .toList();
-
-      if (interestNames.isEmpty) {
-        recommended = [];
-        return;
-      }
-
-      final recs = await supabase
-          .from("communities")
-          .select("*")
-          .overlaps("topics", interestNames)
-          .order("created_at", ascending: false);
-
-      recommended = List<Map<String, dynamic>>.from(recs);
+      recommended = List<Map<String, dynamic>>.from(response.data);
     } catch (_) {
       recommended = [];
     }
   }
 
   Future<void> _loadUserJoinedCommunities() async {
-    if (user == null) {
-      userJoinedCommunities = [];
-      return;
-    }
-
     try {
-      final joins = await supabase
-          .from("user_communities")
-          .select("community_id")
-          .eq("user_id", user!.id);
-
-      final ids = joins.map((j) => j["community_id"]).toList();
-
-      if (ids.isEmpty) {
-        userJoinedCommunities = [];
-        return;
-      }
-
-      final comms = await supabase
-          .from("communities")
-          .select("*")
-          .inFilter("id", ids);
+      final response =
+      await ApiClient.dio.get("/api/communities/my"); // ✅ düzeltildi
 
       userJoinedCommunities =
-      List<Map<String, dynamic>>.from(comms);
+      List<Map<String, dynamic>>.from(response.data);
     } catch (_) {
       userJoinedCommunities = [];
     }
   }
 
   bool _isJoined(Map<String, dynamic> community) {
-    return userJoinedCommunities
-        .any((c) => c["id"] == community["id"]);
+    return userJoinedCommunities.any((c) => c["id"] == community["id"]);
   }
 
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
 
-    final currentTopics =
-        categoryTopics[selectedCategoryKey]
-            ?.map((t) => t["key"].toString().toLowerCase())
-            .toList() ??
-            [];
-
     return allCommunities.where((c) {
-      if (_isJoined(c)) return false;
-
-      final topics = List<String>.from(c["topics"] ?? [])
-          .map((t) => t.toLowerCase())
-          .toList();
-
-      if (selectedTopicKey != null &&
-          !topics.contains(selectedTopicKey!.toLowerCase()))
-        return false;
-
-      if (selectedTopicKey == null &&
-          !topics.any((t) => currentTopics.contains(t)))
-        return false;
-
       final name = (c["name"] ?? "").toLowerCase();
-      final desc = (c["description"] ?? "").toLowerCase();
 
-      return name.contains(q) ||
-          desc.contains(q) ||
-          q.isEmpty;
+      if (q.isEmpty) return true;
+      return name.contains(q);
     }).toList();
   }
 
@@ -211,8 +155,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: categories.map((cat) {
-          final selected =
-              selectedCategoryKey == cat["key"];
+          final selected = selectedCategoryKey == cat["key"];
 
           return Padding(
             padding: const EdgeInsets.only(right: 10),
@@ -234,16 +177,14 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   }
 
   Widget _topicsBar() {
-    final topics =
-        categoryTopics[selectedCategoryKey] ?? [];
+    final topics = categoryTopics[selectedCategoryKey] ?? [];
 
     return SizedBox(
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         children: topics.map((topic) {
-          final selected =
-              selectedTopicKey == topic["key"];
+          final selected = selectedTopicKey == topic["key"];
 
           return Padding(
             padding: const EdgeInsets.only(right: 10),
@@ -253,13 +194,27 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
               selectedColor: AppTheme.primary,
               onSelected: (_) {
                 setState(() {
-                  selectedTopicKey =
-                  selected ? null : topic["key"];
+                  selectedTopicKey = selected ? null : topic["key"];
                 });
               },
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _communityTile(Map<String, dynamic> c) {
+    final isJoined = _isJoined(c);
+
+    return Card(
+      child: ListTile(
+        title: Text(c["name"] ?? ""),
+        subtitle: Text(c["description"] ?? ""),
+        trailing: ElevatedButton(
+          onPressed: isJoined ? null : () => _joinCommunity(c["id"]),
+          child: Text(isJoined ? "Katıldın" : "Katıl"),
+        ),
       ),
     );
   }
@@ -273,8 +228,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
     return Scaffold(
       appBar: AppBar(
         title: TextField(
-          onChanged: (v) =>
-              setState(() => searchQuery = v),
+          onChanged: (v) => setState(() => searchQuery = v),
           decoration: InputDecoration(
             hintText: l10n.search,
             border: InputBorder.none,
@@ -292,14 +246,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
             const SizedBox(height: 10),
             _topicsBar(),
             const SizedBox(height: 20),
-            ..._filteredCommunities()
-                .map((c) => ListTile(
-              title:
-              Text(c["name"] ?? ""),
-              subtitle: Text(
-                  c["description"] ?? ""),
-            ))
-                .toList(),
+            ..._filteredCommunities().map(_communityTile).toList(),
           ],
         ),
       ),
