@@ -135,7 +135,18 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
   bool _isJoined(Map<String, dynamic> community) {
     return userJoinedCommunities.any((c) => c["id"] == community["id"]);
   }
+  Future<void> _leaveCommunity(String id) async {
+    try {
+      await ApiClient.dio.delete("/api/communities/$id/leave");
 
+      setState(() {
+        userJoinedCommunities.removeWhere((c) => c["id"] == id);
+      });
+
+    } catch (e) {
+      print("Leave error: $e");
+    }
+  }
   List<Map<String, dynamic>> _filteredCommunities() {
     final q = searchQuery.toLowerCase();
 
@@ -212,8 +223,14 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
         title: Text(c["name"] ?? ""),
         subtitle: Text(c["description"] ?? ""),
         trailing: ElevatedButton(
-          onPressed: isJoined ? null : () => _joinCommunity(c["id"]),
-          child: Text(isJoined ? "Katıldın" : "Katıl"),
+          onPressed: () {
+            if (isJoined) {
+              _leaveCommunity(c["id"]);
+            } else {
+              _joinCommunity(c["id"]);
+            }
+          },
+          child: Text(isJoined ? "Ayrıl" : "Katıl"),
         ),
       ),
     );
