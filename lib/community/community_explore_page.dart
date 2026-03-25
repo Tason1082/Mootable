@@ -144,7 +144,7 @@ class _CommunityExplorePageState extends State<CommunityExplorePage> {
       });
 
     } catch (e) {
-      print("Leave error: $e");
+     print("Leave error: $e");
     }
   }
   List<Map<String, dynamic>> _filteredCommunities() {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/api_service.dart';
 
 import 'community_detail_page.dart';
 
@@ -11,38 +11,18 @@ class MyCommunityPage extends StatefulWidget {
 }
 
 class _MyCommunityPageState extends State<MyCommunityPage> {
-  final supabase = Supabase.instance.client;
-
   late Future<List<Map<String, dynamic>>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = _loadMyCommunities();
+    _future = ApiService.getMyCommunities();
   }
 
-  Future<List<Map<String, dynamic>>> _loadMyCommunities() async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return [];
-
-    // 1️⃣ Kullanıcının community_id'lerini al
-    final userCommunities = await supabase
-        .from('user_communities')
-        .select('community_id')
-        .eq('user_id', user.id);
-
-    if (userCommunities.isEmpty) return [];
-
-    final communityIds =
-    userCommunities.map((e) => e['community_id']).toList();
-
-    // 2️⃣ community_id'lere göre communities tablosunu çek
-    final communities = await supabase
-        .from('communities')
-        .select()
-        .inFilter('id', communityIds);
-
-    return List<Map<String, dynamic>>.from(communities);
+  Future<void> _refresh() async {
+    setState(() {
+      _future = ApiService.getMyCommunities();
+    });
   }
 
   @override
@@ -58,66 +38,85 @@ class _MyCommunityPageState extends State<MyCommunityPage> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
+          if (snapshot.hasError) {
+            return Center(
               child: Text(
-                "Henüz katıldığın bir topluluk yok",
-                style: TextStyle(fontSize: 16),
+                "Hata: ${snapshot.error}",
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              child: ListView(
+                children: const [
+                  SizedBox(height: 300),
+                  Center(
+                    child: Text(
+                      "Henüz katıldığın bir topluluk yok",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
               ),
             );
           }
 
           final communities = snapshot.data!;
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: communities.length,
-            itemBuilder: (context, index) {
-              final community = communities[index];
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: communities.length,
+              itemBuilder: (context, index) {
+                final community = communities[index];
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 3,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: CircleAvatar(
-                    radius: 26,
-                    backgroundImage: community['image'] != null
-                        ? NetworkImage(community['image'])
-                        : null,
-                    child: community['image'] == null
-                        ? const Icon(Icons.groups)
-                        : null,
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  title: Text(
-                    community['name'],
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                  elevation: 3,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: CircleAvatar(
+                      radius: 26,
+                      backgroundImage: community['image'] != null
+                          ? NetworkImage(community['image'])
+                          : null,
+                      child: community['image'] == null
+                          ? const Icon(Icons.groups)
+                          : null,
                     ),
-                  ),
-                  subtitle: Text(
-                    community['description'] ?? '',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CommunityDetailPage(
-                          community: community,
-                        ),
+                    title: Text(
+                      community['name'] ?? '',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-
-                ),
-              );
-            },
+                    ),
+                    subtitle: Text(
+                      community['description'] ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CommunityDetailPage(
+                            community: community,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           );
         },
       ),
