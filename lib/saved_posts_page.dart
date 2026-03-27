@@ -116,19 +116,57 @@ class SavedPostsPageState extends State<SavedPostsPage> {
         lower.endsWith('.webm');
   }
 
-  Widget _buildThumbnail(String? mediaUrl) {
+  Widget _buildThumbnail(String? mediaUrl, String? content) {
+    final hasText = content != null && content.trim().isNotEmpty;
+
+    // 📝 TEXT ONLY (hiç media yok)
     if (mediaUrl == null || mediaUrl.isEmpty) {
       return Container(
-        color: Colors.grey[200],
-        child: const Icon(Icons.image_not_supported, color: Colors.grey),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        padding: const EdgeInsets.all(8),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Text(
+            hasText ? content! : "No content",
+            maxLines: 6,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.3,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
+        ),
       );
     }
 
+    // 🎥 VIDEO
     if (_isVideo(mediaUrl)) {
       return Stack(
         fit: StackFit.expand,
         children: [
           _VideoThumbnail(videoUrl: mediaUrl),
+
+          // 🔥 Gradient overlay
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.center,
+                colors: [
+                  Colors.black54,
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+
+          // ▶ Play icon
           const Center(
             child: Icon(
               Icons.play_circle_fill,
@@ -136,15 +174,83 @@ class SavedPostsPageState extends State<SavedPostsPage> {
               size: 36,
             ),
           ),
+
+          // 📝 Text overlay
+          if (hasText)
+            Positioned(
+              bottom: 6,
+              left: 6,
+              right: 6,
+              child: Text(
+                content!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  shadows: [
+                    Shadow(
+                      blurRadius: 6,
+                      color: Colors.black,
+                    )
+                  ],
+                ),
+              ),
+            ),
         ],
       );
     }
 
-    return Image.network(
-      mediaUrl,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) =>
-      const Icon(Icons.broken_image, color: Colors.grey),
+    // 🖼️ IMAGE
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.network(
+          mediaUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+          const Icon(Icons.broken_image, color: Colors.grey),
+        ),
+
+        // 🔥 Gradient overlay
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.center,
+              colors: [
+                Colors.black54,
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
+
+        // 📝 Text overlay
+        if (hasText)
+          Positioned(
+            bottom: 6,
+            left: 6,
+            right: 6,
+            child: Text(
+              content!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                shadows: [
+                  Shadow(
+                    blurRadius: 6,
+                    color: Colors.black,
+                  )
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -191,6 +297,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
 
             final post = posts[index];
             final mediaUrl = post["imageUrl"];
+            final content = post["content"]; // backend'e göre değişebilir
 
             return GestureDetector(
               onTap: () {
@@ -206,7 +313,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
               },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: _buildThumbnail(mediaUrl),
+                child: _buildThumbnail(mediaUrl, content),
               ),
             );
           },

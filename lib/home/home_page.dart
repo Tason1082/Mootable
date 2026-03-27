@@ -3,19 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../TimeAgo.dart';
 import '../error_handler.dart';
-import '../comment/comment_page.dart';
+
+
+
 import '../post/post_card.dart';
-import '../quote_post_page.dart';
-import '../video_player_widget.dart';
-import '../community/community_explore_page.dart';
-import '../community/CreateCommunityPage.dart';
-import '../edit_profile_page.dart';
-import '../settings_page.dart';
-import '../post/post_page.dart';
-import '../user_posts_page.dart';
-import '../saved_posts_page.dart';
 import 'home_page_functions.dart';
 import 'left_menu.dart';
 import 'right_profile_drawer.dart';

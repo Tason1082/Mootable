@@ -210,11 +210,10 @@ class _PostCardState extends State<PostCard> {
               child: Icon(Icons.groups, color: colors.onSurfaceVariant),
             ),
             title: Text(
-              post["community"] ?? "",
+              "${post["username"] ?? "user"} • ${post["community"] ?? ""}",
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
-              overflow: TextOverflow.ellipsis,
             ),
             subtitle: Text(
               post["created_at"] != null

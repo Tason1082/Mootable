@@ -1,14 +1,18 @@
-import 'dart:convert';
-import 'dart:io';
 
+import 'dart:io';
+import 'package:dio/dio.dart'; // MultipartFile için
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:image_picker/image_picker.dart';
 
+import '../core/api_client.dart';
 
-import '../core/api_config.dart';
+import '../core/auth_service.dart';
+
+
+
 
 class PostAddPage extends StatefulWidget {
   const PostAddPage({super.key});
@@ -60,59 +64,62 @@ class _PostAddPageState extends State<PostAddPage> {
     });
   }
 
+
+
   Future<void> _uploadPost() async {
     setState(() => _loading = true);
 
     try {
-      final uri = Uri.parse("${ApiConfig.baseUrl}/api/posts");
-      final request = http.MultipartRequest("POST", uri);
-
-      final token = await _storage.read(key: "token");
-
-      if (token == null) {
-        throw Exception("Token yok, login gerekli");
-      }
-
-      request.headers["Authorization"] = "Bearer $token";
+      // Self-signed sertifikalara izin
+      ApiClient.allowSelfSignedCerts();
 
       final tags = _tagsController.text
           .split(',')
           .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
           .toList();
 
-      request.fields["title"] = _titleController.text.trim();
-      request.fields["content"] = _bodyController.text.trim();
-      request.fields["link"] = _linkController.text.trim();
-      request.fields["tags"] = jsonEncode(tags);
+      final userId = await AuthService.getUserId();
+      if (userId == null) throw Exception("Kullanıcı ID alınamadı");
 
-      if (_selectedCommunityId != null) {
-        request.fields["community"] = _selectedCommunityId!;
-      }
+      // Dio MultipartFile kullan
+      FormData formData = FormData.fromMap({
+        "title": _titleController.text.trim().isEmpty ? "" : _titleController.text.trim(),
+        "content": _bodyController.text.trim().isEmpty ? "" : _bodyController.text.trim(),
+        "link": _linkController.text.trim().isEmpty ? "" : _linkController.text.trim(),
+        "tags": tags,
+        "user": userId,
+        if (_selectedCommunityId != null) "community": _selectedCommunityId!,
+        if (_selectedImage != null)
+          "Media": await MultipartFile.fromFile(
+            _selectedImage!.path,
+            filename: "image.jpg",
+          ),
+        if (_selectedVideo != null)
+          "Media": await MultipartFile.fromFile(
+            _selectedVideo!.path,
+            filename: "video.mp4",
+          ),
+      });
 
-      if (_selectedImage != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath("Media", _selectedImage!.path),
-        );
-      }
-
-      if (_selectedVideo != null) {
-        request.files.add(
-          await http.MultipartFile.fromPath("Media", _selectedVideo!.path),
-        );
-      }
-
-      final response = await request.send();
-      final body = await response.stream.bytesToString();
+      final response = await ApiClient.dio.post(
+        "/api/posts",
+        data: formData,
+        options: Options(contentType: "multipart/form-data"),
+      );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Hata: $body")),
+          SnackBar(content: Text("Hata: ${response.data}")),
         );
       }
     } catch (e) {
       debugPrint("Exception: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Hata: $e")),
+      );
     }
 
     setState(() => _loading = false);
