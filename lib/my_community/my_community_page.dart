@@ -108,7 +108,7 @@ class _MyCommunityPageState extends State<MyCommunityPage> {
                         context,
                         MaterialPageRoute(
                           builder: (_) => CommunityDetailPage(
-                            community: community,
+                            communityName: community['name'],
                           ),
                         ),
                       );
