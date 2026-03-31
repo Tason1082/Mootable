@@ -81,10 +81,6 @@ Future<void> joinCommunity(
 
 
 
-
-/// =======================================================
-/// TOGGLE VOTE (API)
-/// =======================================================
 Future<void> toggleVote(HomePageState state, int postId, int vote) async {
   final index = state.posts.indexWhere((p) => p["id"] == postId);
   if (index == -1) return;
@@ -94,34 +90,39 @@ Future<void> toggleVote(HomePageState state, int postId, int vote) async {
   final previousVote = post["user_vote"] ?? 0;
   final previousCount = post["votes_count"] ?? 0;
 
-  // 🔹 sadece local user_vote değişiyor, votes_count backend’den geliyor
+  int newVote = (previousVote == vote) ? 0 : vote;
+  final delta = newVote - previousVote;
+
+  // 🔥 optimistic UI
   state.setState(() {
-    if (previousVote == vote) {
-      post["user_vote"] = 0;
-    } else {
-      post["user_vote"] = vote;
-    }
+    post["user_vote"] = newVote;
+    post["votes_count"] = previousCount + delta;
   });
 
   try {
     final res = await ApiClient.dio.post(
-      "/api/posts/vote",
-      data: {"postId": postId, "vote": vote},
+      "/api/posts/$postId/vote", // 🔥 IMPORTANT: postId URL'de
+      data: {
+        "vote": newVote, // sadece vote gönder
+      },
     );
 
-    final score = res.data["score"] ?? previousCount;
+    final data = res.data;
 
+    // 🔥 backend authoritative result
     state.setState(() {
-      post["votes_count"] = score; // total score her zaman backend’den
+      post["user_vote"] = data["userVote"];
+      post["votes_count"] = data["score"];
     });
+
   } catch (_) {
-    // Hata durumunda user_vote geri al
+    // rollback
     state.setState(() {
       post["user_vote"] = previousVote;
+      post["votes_count"] = previousCount;
     });
   }
 }
-
 
 
 
