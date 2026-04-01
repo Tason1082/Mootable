@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
-
 import '../core/api_client.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
@@ -13,6 +12,7 @@ import 'package:video_thumbnail/video_thumbnail.dart';
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final BuildContext parentContext;
+
   final void Function(int postId, int vote)? onVote;
   final void Function(String communityName, int index)? onJoinCommunity;
 
@@ -32,16 +32,86 @@ class _PostCardState extends State<PostCard> {
   Uint8List? videoThumbnail;
   bool _isSaved = false;
   bool _loadingSaved = true;
+  bool _isJoined = false;
+  bool _loadingJoin = true;
+
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
     _generateVideoThumbnail();
-    _checkIfSaved(); // ekran açılır açılmaz backend kontrolü
+    _checkIfSaved();
+    _checkIfJoined(); // sayfa açılır açılmaz katılım kontrolü
   }
 
-  // Backend ile kaydedilmiş mi kontrol et
+  // ================= JOIN / LEAVE =================
+  Future<void> _checkIfJoined() async {
+    final communityId = widget.post["communityId"];
+    if (communityId == null) return;
+
+    setState(() => _loadingJoin = true);
+    try {
+      final token = await _storage.read(key: "jwt_token");
+      final response = await ApiClient.dio.get(
+        "/api/communities/$communityId/is_joined",
+        options: Options(headers: {"Authorization": "Bearer $token"}),
+      );
+
+      final joined = response.data?["isJoined"] ?? false;
+
+      if (mounted) {
+        setState(() {
+          _isJoined = joined;
+          _loadingJoin = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingJoin = false);
+      debugPrint("Katılım kontrol hatası: $e");
+    }
+  }
+
+  Future<void> _toggleJoin() async {
+    final communityId = widget.post["communityId"];
+    if (communityId == null) return;
+
+    setState(() => _loadingJoin = true);
+
+    try {
+      final token = await _storage.read(key: "jwt_token");
+
+      if (_isJoined) {
+        // Ayrıl
+        await ApiClient.dio.delete(
+          "/api/communities/$communityId/leave",
+          options: Options(headers: {"Authorization": "Bearer $token"}),
+        );
+        if (mounted) setState(() => _isJoined = false);
+        ScaffoldMessenger.of(widget.parentContext)
+            .showSnackBar(const SnackBar(content: Text("Topluluktan ayrıldınız")));
+      } else {
+        // Katıl
+        await ApiClient.dio.post(
+          "/api/communities/$communityId/join",
+          options: Options(headers: {"Authorization": "Bearer $token"}),
+        );
+        if (mounted) setState(() => _isJoined = true);
+        ScaffoldMessenger.of(widget.parentContext)
+            .showSnackBar(const SnackBar(content: Text("Topluluğa katıldınız")));
+      }
+
+      widget.onJoinCommunity?.call(widget.post["community"], widget.post["id"]);
+    } catch (e) {
+      if (mounted) setState(() => _loadingJoin = false);
+      ScaffoldMessenger.of(widget.parentContext)
+          .showSnackBar(SnackBar(content: Text("İşlem başarısız: $e")));
+    } finally {
+      if (mounted) setState(() => _loadingJoin = false);
+    }
+  }
+
+  // ================= SAVED =================
   Future<void> _checkIfSaved() async {
     final postId = int.parse(widget.post["id"].toString());
 
@@ -66,30 +136,8 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // Video thumbnail üretme
-  Future<void> _generateVideoThumbnail() async {
-    final url = widget.post["imageUrl"] ?? widget.post["image_url"];
-    if (url == null) return;
-    final path = Uri.parse(url).path.toLowerCase();
-
-    if (path.endsWith(".mp4") ||
-        path.endsWith(".mov") ||
-        path.endsWith(".avi") ||
-        path.endsWith(".webm")) {
-      final thumb = await VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 400,
-        quality: 75,
-      );
-      if (!mounted) return;
-      setState(() => videoThumbnail = thumb);
-    }
-  }
-
-  // Kaydetme / kaydı kaldırma
   Future<void> _toggleSave() async {
-    if (_loadingSaved) return; // toggle sırasında tekrar tıklanmasın
+    if (_loadingSaved) return;
     final postId = int.parse(widget.post["id"].toString());
     setState(() => _loadingSaved = true);
 
@@ -111,13 +159,33 @@ class _PostCardState extends State<PostCard> {
       }
     } catch (e) {
       if (mounted) setState(() => _loadingSaved = false);
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-        SnackBar(content: Text("Kaydetme hatası: $e")),
-      );
+      ScaffoldMessenger.of(widget.parentContext)
+          .showSnackBar(SnackBar(content: Text("Kaydetme hatası: $e")));
     }
   }
 
-  // Medya widget
+  // ================= VIDEO THUMBNAIL =================
+  Future<void> _generateVideoThumbnail() async {
+    final url = widget.post["imageUrl"] ?? widget.post["image_url"];
+    if (url == null) return;
+    final path = Uri.parse(url).path.toLowerCase();
+
+    if (path.endsWith(".mp4") ||
+        path.endsWith(".mov") ||
+        path.endsWith(".avi") ||
+        path.endsWith(".webm")) {
+      final thumb = await VideoThumbnail.thumbnailData(
+        video: url,
+        imageFormat: ImageFormat.JPEG,
+        maxWidth: 400,
+        quality: 75,
+      );
+      if (!mounted) return;
+      setState(() => videoThumbnail = thumb);
+    }
+  }
+
+  // ================= MEDIA WIDGET =================
   Widget _buildMediaWidget(String? url) {
     if (url == null) return const SizedBox.shrink();
     final path = Uri.parse(url).path.toLowerCase();
@@ -192,6 +260,7 @@ class _PostCardState extends State<PostCard> {
     );
   }
 
+  // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -204,7 +273,6 @@ class _PostCardState extends State<PostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           ListTile(
             leading: CircleAvatar(
               backgroundColor: colors.surfaceVariant,
@@ -218,19 +286,18 @@ class _PostCardState extends State<PostCard> {
             ),
             subtitle: Text(
               post["created_at"] != null
-                  ? TimeAgo.format(
-                widget.parentContext,
-                DateTime.parse(post["created_at"]),
-              )
+                  ? TimeAgo.format(widget.parentContext, DateTime.parse(post["created_at"]))
                   : "",
             ),
-            trailing: post["is_member"] != true
-                ? TextButton(
-              onPressed: () =>
-                  widget.onJoinCommunity?.call(post["community"], 0),
-              child: const Text("Katıl"),
+            trailing: _loadingJoin
+                ? const SizedBox(
+              width: 80,
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
-                : null,
+                : TextButton(
+              onPressed: _toggleJoin,
+              child: Text(_isJoined ? "Ayrıl" : "Katıl"),
+            ),
           ),
 
           if (post["imageUrl"] != null || post["image_url"] != null)
@@ -251,26 +318,19 @@ class _PostCardState extends State<PostCard> {
                 IconButton(
                   icon: Icon(
                     Icons.arrow_upward,
-                    color: post["user_vote"] == 1
-                        ? colors.primary
-                        : colors.onSurfaceVariant,
+                    color: post["user_vote"] == 1 ? colors.primary : colors.onSurfaceVariant,
                   ),
                   onPressed: () => widget.onVote?.call(postId, 1),
                 ),
                 Text("${post["votes_count"] ?? 0}"),
-
                 IconButton(
                   icon: Icon(
                     Icons.arrow_downward,
-                    color: post["user_vote"] == -1
-                        ? colors.error
-                        : colors.onSurfaceVariant,
+                    color: post["user_vote"] == -1 ? colors.error : colors.onSurfaceVariant,
                   ),
                   onPressed: () => widget.onVote?.call(postId, -1),
                 ),
-
                 const SizedBox(width: 8),
-
                 IconButton(
                   icon: const Icon(Icons.comment_outlined),
                   onPressed: () {
@@ -283,9 +343,7 @@ class _PostCardState extends State<PostCard> {
                   },
                 ),
                 Text("${post["comment_count"] ?? 0}"),
-
                 const Spacer(),
-
                 IconButton(
                   icon: const Icon(Icons.repeat),
                   onPressed: () {
@@ -297,7 +355,6 @@ class _PostCardState extends State<PostCard> {
                     );
                   },
                 ),
-
                 _loadingSaved
                     ? const SizedBox(
                   width: 24,
@@ -307,17 +364,14 @@ class _PostCardState extends State<PostCard> {
                     : IconButton(
                   icon: Icon(
                     _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                    color: _isSaved
-                        ? Colors.orange
-                        : colors.onSurfaceVariant,
+                    color: _isSaved ? Colors.orange : colors.onSurfaceVariant,
                   ),
                   onPressed: _toggleSave,
                 ),
               ],
             ),
           ),
-
-          const Divider(height: 1), // Instagram tarzı post ayırıcı çizgi
+          const Divider(height: 1),
         ],
       ),
     );

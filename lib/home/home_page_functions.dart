@@ -87,47 +87,28 @@ Future<void> toggleVote(HomePageState state, int postId, int vote) async {
 
   final post = state.posts[index];
 
-  final previousVote = post["user_vote"] ?? 0;
-  final previousCount = post["votes_count"] ?? 0;
-
-  int newVote = (previousVote == vote) ? 0 : vote;
-  final delta = newVote - previousVote;
-
-  // 🔥 optimistic UI
-  state.setState(() {
-    post["user_vote"] = newVote;
-    post["votes_count"] = previousCount + delta;
-  });
-
   try {
     final res = await ApiClient.dio.post(
-      "/api/posts/$postId/vote", // 🔥 IMPORTANT: postId URL'de
-      data: {
-        "vote": newVote, // sadece vote gönder
-      },
+      "/api/posts/$postId/vote",
+      data: {"vote": vote},
     );
 
     final data = res.data;
 
-    // 🔥 backend authoritative result
-    state.setState(() {
-      post["user_vote"] = data["userVote"];
-      post["votes_count"] = data["score"];
-    });
-
-  } catch (_) {
-    // rollback
-    state.setState(() {
-      post["user_vote"] = previousVote;
-      post["votes_count"] = previousCount;
-    });
+    // Backend authoritative response ile state güncelle
+    if (data != null) {
+      state.setState(() {
+        post["user_vote"] = data["userVote"];
+        post["votes_count"] = data["score"];
+      });
+    }
+  } catch (e) {
+    // Hata durumunda kullanıcıya bildirim verebilirsin
+    ScaffoldMessenger.of(state.context).showSnackBar(
+      SnackBar(content: Text("Oy verilemedi: $e")),
+    );
   }
 }
-
-
-
-
-
 
 
 

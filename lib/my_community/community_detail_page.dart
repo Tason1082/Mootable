@@ -173,6 +173,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                           .showSnackBar(SnackBar(content: Text('Vote hatası: $e')));
                     }
                   },
+
                   onJoinCommunity: (communityName, _) async {
                     try {
                       await ApiClient.dio.post('/api/communities/join',

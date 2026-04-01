@@ -373,6 +373,7 @@ class _SavedPostsViewerState extends State<SavedPostsViewer> {
             post: post,
             parentContext: context,
             onVote: (postId, vote) {},
+
             onJoinCommunity: (communityName, index) {},
           );
         },
