@@ -294,10 +294,12 @@ class _PostCardState extends State<PostCard> {
               width: 80,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
-                : TextButton(
+                : (!_isJoined
+                ? TextButton(
               onPressed: _toggleJoin,
-              child: Text(_isJoined ? "Ayrıl" : "Katıl"),
-            ),
+              child: const Text("Katıl"),
+            )
+                : const SizedBox.shrink()),
           ),
 
           if (post["imageUrl"] != null || post["image_url"] != null)

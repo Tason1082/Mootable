@@ -115,67 +115,60 @@ class SavedPostsPageState extends State<SavedPostsPage> {
         lower.endsWith('.mkv') ||
         lower.endsWith('.webm');
   }
-
-  Widget _buildThumbnail(String? mediaUrl, String? content) {
+  Widget _buildThumbnail(
+      String? mediaUrl,
+      String? content,
+      String? username,
+      String? avatarUrl,
+      ) {
     final hasText = content != null && content.trim().isNotEmpty;
 
-    // 📝 TEXT ONLY (hiç media yok)
+    Widget mediaWidget;
+
+    // 📝 TEXT ONLY
     if (mediaUrl == null || mediaUrl.isEmpty) {
-      return Container(
+      mediaWidget = Container(
         decoration: BoxDecoration(
           color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(6),
           border: Border.all(color: Colors.grey.shade300),
         ),
         padding: const EdgeInsets.all(8),
-        child: Align(
-          alignment: Alignment.topLeft,
-          child: Text(
-            hasText ? content! : "No content",
-            maxLines: 6,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.3,
-              fontWeight: FontWeight.w500,
-              color: Colors.black87,
-            ),
+        child: Text(
+          hasText ? content! : "No content",
+          maxLines: 6,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.3,
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
           ),
         ),
       );
     }
 
     // 🎥 VIDEO
-    if (_isVideo(mediaUrl)) {
-      return Stack(
+    else if (_isVideo(mediaUrl)) {
+      mediaWidget = Stack(
         fit: StackFit.expand,
         children: [
           _VideoThumbnail(videoUrl: mediaUrl),
 
-          // 🔥 Gradient overlay
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.center,
-                colors: [
-                  Colors.black54,
-                  Colors.transparent,
-                ],
+                colors: [Colors.black54, Colors.transparent],
               ),
             ),
           ),
 
-          // ▶ Play icon
           const Center(
-            child: Icon(
-              Icons.play_circle_fill,
-              color: Colors.white70,
-              size: 36,
-            ),
+            child: Icon(Icons.play_circle_fill,
+                color: Colors.white70, size: 36),
           ),
 
-          // 📝 Text overlay
           if (hasText)
             Positioned(
               bottom: 6,
@@ -189,12 +182,6 @@ class SavedPostsPageState extends State<SavedPostsPage> {
                   color: Colors.white,
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  shadows: [
-                    Shadow(
-                      blurRadius: 6,
-                      color: Colors.black,
-                    )
-                  ],
                 ),
               ),
             ),
@@ -203,53 +190,88 @@ class SavedPostsPageState extends State<SavedPostsPage> {
     }
 
     // 🖼️ IMAGE
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.network(
-          mediaUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
-          const Icon(Icons.broken_image, color: Colors.grey),
-        ),
-
-        // 🔥 Gradient overlay
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.center,
-              colors: [
-                Colors.black54,
-                Colors.transparent,
-              ],
-            ),
+    else {
+      mediaWidget = Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.network(
+            mediaUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+            const Icon(Icons.broken_image),
           ),
-        ),
 
-        // 📝 Text overlay
-        if (hasText)
-          Positioned(
-            bottom: 6,
-            left: 6,
-            right: 6,
-            child: Text(
-              content!,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                shadows: [
-                  Shadow(
-                    blurRadius: 6,
-                    color: Colors.black,
-                  )
-                ],
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.center,
+                colors: [Colors.black54, Colors.transparent],
               ),
             ),
           ),
+
+          if (hasText)
+            Positioned(
+              bottom: 6,
+              left: 6,
+              right: 6,
+              child: Text(
+                content!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 👤 USER HEADER
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          child: Row(
+            children: [
+              // 🔥 Avatar sadece varsa göster
+              if (avatarUrl != null && avatarUrl.isNotEmpty)
+                CircleAvatar(
+                  radius: 8,
+                  backgroundImage: NetworkImage(avatarUrl),
+                ),
+
+              if (avatarUrl != null && avatarUrl.isNotEmpty)
+                const SizedBox(width: 4),
+
+              // 🧾 Username
+              Expanded(
+                child: Text(
+                  username ?? "",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // 📦 POST
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: mediaWidget,
+          ),
+        ),
       ],
     );
   }
@@ -298,7 +320,8 @@ class SavedPostsPageState extends State<SavedPostsPage> {
             final post = posts[index];
             final mediaUrl = post["imageUrl"];
             final content = post["content"]; // backend'e göre değişebilir
-
+            final username = post["username"];
+            final avatarUrl = post["avatarUrl"];
             return GestureDetector(
               onTap: () {
                 Navigator.push(
@@ -313,7 +336,11 @@ class SavedPostsPageState extends State<SavedPostsPage> {
               },
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: _buildThumbnail(mediaUrl, content),
+                child: _buildThumbnail(
+                  mediaUrl,
+                  content,
+                  username,avatarUrl
+                ),
               ),
             );
           },

@@ -5,7 +5,7 @@ import '../core/api_client.dart';
 import '../post/post_page.dart';
 import 'home_page.dart';
 
-Future<void> fetchPosts(HomePageState state, {bool loadMore = false}) async {
+Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
   if (state.isLoadingMore || (!state.hasMore && loadMore)) return;
 
   try {
@@ -60,7 +60,7 @@ Future<void> fetchPosts(HomePageState state, {bool loadMore = false}) async {
 /// JOIN COMMUNITY (API)
 /// =======================================================
 Future<void> joinCommunity(
-    HomePageState state,
+    dynamic state,
     String communityId,
     int postIndex,
     ) async {
@@ -81,7 +81,7 @@ Future<void> joinCommunity(
 
 
 
-Future<void> toggleVote(HomePageState state, int postId, int vote) async {
+Future<void> toggleVote(dynamic state, int postId, int vote) async {
   final index = state.posts.indexWhere((p) => p["id"] == postId);
   if (index == -1) return;
 
@@ -117,7 +117,7 @@ Future<void> toggleVote(HomePageState state, int postId, int vote) async {
 /// TOGGLE SAVE (API ONLY)
 /// =======================================================
 Future<void> toggleSave(
-    HomePageState state,
+    dynamic state,
     int postId,
     bool currentlySaved,
     ) async {

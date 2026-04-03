@@ -10,6 +10,8 @@ import '../quote_post_page.dart';
 import '../video_player_widget.dart';
 import '../core/api_client.dart';
 
+// 🔥 EKLENDİ
+import '../home/home_page_functions.dart';
 
 class CommunityDetailPage extends StatefulWidget {
   final String communityName;
@@ -25,6 +27,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   bool isLoading = true;
   String? error;
 
+  // 🔥 EKLENDİ (joinCommunity için gerekli)
+  List<Map<String, dynamic>> posts = [];
+
   @override
   void initState() {
     super.initState();
@@ -35,14 +40,30 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     setState(() => isLoading = true);
     try {
       final response = await ApiClient.dio.get(
-        '/api/posts/community/byname/${widget.communityName}', // communityName gönder
+        '/api/posts/community/byname/${widget.communityName}',
       );
 
+      // 🔥 MAPPING EKLENDİ
+      final raw = List<Map<String, dynamic>>.from(response.data);
+
+      final mappedPosts = raw.map((p) {
+        return {
+          ...p,
+          "votes_count": p["netScore"] ?? 0,
+          "user_vote": p["userVote"] ?? 0,
+          "created_at": p["createdAt"],
+          "community": p["community"],
+          "communityId": p["communityId"],
+          "comment_count": p["commentCount"] ?? 0,
+        };
+      }).toList();
+
       setState(() {
+        posts = mappedPosts; // 🔥 önemli
         community = {
           'name': widget.communityName,
-          'description': 'Community description', // opsiyonel, backend’den alabilirsiniz
-          'posts': response.data, // API’den gelen postlar
+          'description': 'Community description',
+          'posts': mappedPosts,
         };
         isLoading = false;
       });
@@ -151,40 +172,22 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           // POSTS
           Expanded(
             child: ListView.builder(
-              itemCount: community?['posts']?.length ?? 0,
+              itemCount: posts.length,
               itemBuilder: (context, index) {
-                final post = community!['posts'][index];
+                final post = posts[index];
+
                 return PostCard(
                   post: post,
                   parentContext: context,
-                  onVote: (postId, vote) async {
-                    // Oy verme API'si
-                    try {
-                      await ApiClient.dio.post('/api/posts/vote',
-                          data: {"postId": postId, "vote": vote});
-                      // Lokal state güncelle
-                      setState(() {
-                        final oldVote = post['user_vote'] ?? 0;
-                        post['votes_count'] = (post['votes_count'] ?? 0) - oldVote + vote;
-                        post['user_vote'] = vote;
-                      });
-                    } catch (e) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('Vote hatası: $e')));
-                    }
+
+                  // 🔥 ARTIK GLOBAL FONKSİYON
+                  onVote: (postId, vote) {
+                    toggleVote(this, postId, vote);
                   },
 
-                  onJoinCommunity: (communityName, _) async {
-                    try {
-                      await ApiClient.dio.post('/api/communities/join',
-                          data: {"communityName": communityName});
-                      setState(() {
-                        post['is_member'] = true;
-                      });
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Join hatası: $e')));
-                    }
+                  // 🔥 INDEX FIX + GLOBAL JOIN
+                  onJoinCommunity: (communityName, _) {
+                    joinCommunity(this, communityName, index);
                   },
                 );
               },

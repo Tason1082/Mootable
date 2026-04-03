@@ -1,18 +1,11 @@
-
 import 'dart:io';
-import 'package:dio/dio.dart'; // MultipartFile için
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
-
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_client.dart';
-
 import '../core/auth_service.dart';
-
-
-
 
 class PostAddPage extends StatefulWidget {
   const PostAddPage({super.key});
@@ -26,13 +19,45 @@ class _PostAddPageState extends State<PostAddPage> {
   final _bodyController = TextEditingController();
   final _tagsController = TextEditingController();
   final _linkController = TextEditingController();
-  final _storage = const FlutterSecureStorage();
 
+  String? _selectedCommunityName;
   File? _selectedImage;
   File? _selectedVideo;
 
   bool _loading = false;
+
+  // ✅ COMMUNITY STATE
   String? _selectedCommunityId;
+  List<Map<String, dynamic>> _communities = [];
+  bool _loadingCommunities = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCommunities();
+  }
+
+  // ================= COMMUNITY FETCH =================
+  Future<void> _fetchCommunities() async {
+    try {
+      final response = await ApiClient.dio.get("/api/communities");
+
+      final data = response.data;
+
+      List listData = data is List ? data : data["data"];
+
+      setState(() {
+        _communities = listData.map((e) => {
+          "id": e["id"].toString(),
+          "name": e["name"],
+        }).toList();
+        _loadingCommunities = false;
+      });
+    } catch (e) {
+      debugPrint("Topluluk çekme hatası: $e");
+      setState(() => _loadingCommunities = false);
+    }
+  }
 
   /// Foto seç
   Future<void> _pickImage() async {
@@ -64,13 +89,11 @@ class _PostAddPageState extends State<PostAddPage> {
     });
   }
 
-
-
+  // ================= UPLOAD =================
   Future<void> _uploadPost() async {
     setState(() => _loading = true);
 
     try {
-      // Self-signed sertifikalara izin
       ApiClient.allowSelfSignedCerts();
 
       final tags = _tagsController.text
@@ -82,19 +105,23 @@ class _PostAddPageState extends State<PostAddPage> {
       final userId = await AuthService.getUserId();
       if (userId == null) throw Exception("Kullanıcı ID alınamadı");
 
-      // Dio MultipartFile kullan
       FormData formData = FormData.fromMap({
-        "title": _titleController.text.trim().isEmpty ? "" : _titleController.text.trim(),
-        "content": _bodyController.text.trim().isEmpty ? "" : _bodyController.text.trim(),
-        "link": _linkController.text.trim().isEmpty ? "" : _linkController.text.trim(),
+        "title": _titleController.text.trim(),
+        "content": _bodyController.text.trim(),
+        "link": _linkController.text.trim(),
         "tags": tags,
         "user": userId,
-        if (_selectedCommunityId != null) "community": _selectedCommunityId!,
+
+        // ✅ DOĞRU
+        if (_selectedCommunityName != null)
+          "community": _selectedCommunityName,
+
         if (_selectedImage != null)
           "Media": await MultipartFile.fromFile(
             _selectedImage!.path,
             filename: "image.jpg",
           ),
+
         if (_selectedVideo != null)
           "Media": await MultipartFile.fromFile(
             _selectedVideo!.path,
@@ -125,8 +152,7 @@ class _PostAddPageState extends State<PostAddPage> {
     setState(() => _loading = false);
   }
 
-
-
+  // ================= UI =================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -151,30 +177,54 @@ class _PostAddPageState extends State<PostAddPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
+            // ✅ COMMUNITY DROPDOWN
+            _loadingCommunities
+                ? const Center(child: CircularProgressIndicator())
+                :DropdownButtonFormField<String>(
+              value: _selectedCommunityName,
+              hint: const Text("Topluluk seç"),
+              items: _communities.map((community) {
+                return DropdownMenuItem<String>(
+                  value: community["name"], // 🔥 ID değil NAME
+                  child: Text(community["name"]),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedCommunityName = value;
+                });
+              },
+            ),
+
+            const SizedBox(height: 12),
+
             TextField(
               controller: _titleController,
               decoration: const InputDecoration(labelText: "Başlık"),
             ),
             const SizedBox(height: 12),
+
             TextField(
               controller: _tagsController,
-              decoration:
-              const InputDecoration(labelText: "Etiketler (virgülle)"),
+              decoration: const InputDecoration(labelText: "Etiketler (virgülle)"),
             ),
             const SizedBox(height: 12),
+
             TextField(
               controller: _linkController,
               decoration: const InputDecoration(labelText: "Link"),
             ),
             const SizedBox(height: 12),
+
             TextField(
               controller: _bodyController,
               maxLines: null,
               decoration: const InputDecoration(labelText: "İçerik"),
             ),
+
             const SizedBox(height: 16),
 
-            /// Foto preview
             if (_selectedImage != null)
               Stack(
                 children: [
@@ -198,7 +248,6 @@ class _PostAddPageState extends State<PostAddPage> {
                 ],
               ),
 
-            /// Video preview
             if (_selectedVideo != null)
               Stack(
                 children: [
@@ -225,6 +274,7 @@ class _PostAddPageState extends State<PostAddPage> {
               ),
 
             const SizedBox(height: 20),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [

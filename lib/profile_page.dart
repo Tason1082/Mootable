@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:mootable/post/post_card.dart';
 import '../core/api_client.dart';
 import '../core/auth_service.dart';
 import 'edit_profile_page.dart';
+import 'home/home_page_functions.dart';
 
 class ProfilePage extends StatefulWidget {
 
@@ -43,10 +45,23 @@ class _ProfilePageState extends State<ProfilePage>
 
 final postRes = await ApiClient.dio.get('/api/posts/me');print("POST RESPONSE -> ${postRes.data}");
 
+      final raw = List<Map<String, dynamic>>.from(postRes.data);
+
+      final mappedPosts = raw.map((p) {
+        return {
+          ...p,
+          "votes_count": p["netScore"] ?? 0,
+          "user_vote": p["userVote"] ?? 0,
+          "created_at": p["createdAt"],
+          "community": p["community"],
+          "communityId": p["communityId"],
+          "comment_count": p["commentCount"] ?? 0,
+        };
+      }).toList();
+
       setState(() {
-        // 🔹 Map olarak cast ediyoruz ki user?['username'] çalışsın
         user = Map<String, dynamic>.from(userRes.data);
-        posts = postRes.data is List ? List.from(postRes.data) : [];
+        posts = mappedPosts;
         loading = false;
       });
     } catch (e, st) {
@@ -210,39 +225,28 @@ final postRes = await ApiClient.dio.get('/api/posts/me');print("POST RESPONSE ->
   }
 
   Widget _buildPosts() {
-    if (posts.isEmpty) return const Center(child: Text("Hiç post yok"));
+    if (posts.isEmpty) {
+      return const Center(child: Text("Hiç post yok"));
+    }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
       itemCount: posts.length,
       itemBuilder: (context, index) {
         final post = posts[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.grey[100],
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(post['title'] ?? '',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Text(post['content'] ?? ''),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  const Icon(Icons.arrow_upward, size: 18),
-                  Text("${post['upvotes'] ?? 0}"),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.comment, size: 18),
-                  Text("${post['commentsCount'] ?? 0}"),
-                ],
-              ),
-            ],
-          ),
+
+        return PostCard(
+          post: post,
+          parentContext: context,
+
+          /// 🔥 HomePage'deki fonksiyonu kullanıyoruz
+          onVote: (postId, vote) {
+            toggleVote(this, postId, vote);
+          },
+
+          /// opsiyonel
+          onJoinCommunity: (communityName, postId) {
+            print("Joined: $communityName");
+          },
         );
       },
     );
