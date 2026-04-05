@@ -9,6 +9,7 @@ import '../error_handler.dart';
 
 import '../post/post_card.dart';
 
+
 import 'home_page_functions.dart';
 import 'left_menu.dart';
 import 'right_profile_drawer.dart';
@@ -85,43 +86,7 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _uploadProfileImage() async {
-    if (user == null) return;
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
-
-    try {
-      final file = File(picked.path);
-      final fileName =
-          "${user!.id}_${DateTime.now().millisecondsSinceEpoch}.jpg";
-
-      await Supabase.instance.client.storage.from('avatars').upload(fileName, file);
-
-      final publicUrl = Supabase.instance.client.storage
-          .from('avatars')
-          .getPublicUrl(fileName);
-
-      await Supabase.instance.client
-          .from('profiles')
-          .update({'avatar_url': publicUrl})
-          .eq('id', user!.id);
-
-      setState(() {
-        profileImageUrl = publicUrl;
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Profil fotoğrafı güncellendi")),
-        );
-      }
-    } catch (e, st) {
-      if (!mounted) return;
-      ErrorHandler.showError(context, e, stackTrace: st);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

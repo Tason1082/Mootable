@@ -64,17 +64,12 @@ class SavedPostsPageState extends State<SavedPostsPage> {
     setState(() => isLoadingMore = true);
 
     try {
-      final token = await _storage.read(key: "jwt_token");
-
       final response = await ApiClient.dio.get(
         "/api/posts/save/me",
         queryParameters: {
           "limit": limit,
           "offset": offset,
         },
-        options: Options(
-          headers: {"Authorization": "Bearer $token"},
-        ),
       );
 
       final List data = response.data;
@@ -120,6 +115,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
       String? content,
       String? username,
       String? avatarUrl,
+    
       ) {
     final hasText = content != null && content.trim().isNotEmpty;
 
@@ -339,7 +335,9 @@ class SavedPostsPageState extends State<SavedPostsPage> {
                 child: _buildThumbnail(
                   mediaUrl,
                   content,
-                  username,avatarUrl
+                  username,
+                  avatarUrl,
+
                 ),
               ),
             );
