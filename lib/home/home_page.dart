@@ -182,7 +182,7 @@ class HomePageState extends State<HomePage> {
             return PostCard(
               post: post,
               parentContext: context,
-              onVote: (postId, vote) => toggleVote(this, postId, vote),
+              onVote: (postId, vote) => toggleVote(this,postId, vote),
               onJoinCommunity: (communityName, index) =>
                   joinCommunity(this, communityName, index),
             );

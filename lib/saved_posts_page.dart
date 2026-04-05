@@ -364,13 +364,14 @@ class SavedPostsViewer extends StatefulWidget {
 }
 
 class _SavedPostsViewerState extends State<SavedPostsViewer> {
+  late List<Map<String, dynamic>> posts; // State listesi
   late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-
+    posts = widget.posts;
     // Tıklanan posttan başlat
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final offset = widget.initialIndex * 500.0;

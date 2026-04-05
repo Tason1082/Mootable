@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
 import '../core/api_client.dart';
+import '../core/api_service.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -44,21 +45,70 @@ class _PostCardState extends State<PostCard> {
     _checkIfSaved();
     _checkIfJoined(); // sayfa açılır açılmaz katılım kontrolü
   }
+  Future<void> _checkIfSaved() async {
+    final postId = int.parse(widget.post["id"].toString());
 
+    try {
+      final isSaved = await ApiService.isPostSaved(postId);
+
+      if (mounted) {
+        setState(() {
+          _isSaved = isSaved;
+          _loadingSaved = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Post kaydedilmiş mi kontrol hatası: $e");
+      if (mounted) {
+        setState(() => _loadingSaved = false);
+      }
+    }
+  }
+
+  Future<void> _toggleSave() async {
+    if (_loadingSaved) return;
+
+    final postId = int.parse(widget.post["id"].toString());
+
+    // 1️⃣ Optimistic update: UI'yi hemen değiştir
+    setState(() {
+      _isSaved = !_isSaved;  // ikon anında değişir
+      _loadingSaved = true;  // spinner göstermek için
+    });
+
+    try {
+      // 2️⃣ API çağrısı
+      final saved = await ApiService.toggleSavePost(postId);
+
+      if (mounted) {
+        setState(() {
+          _isSaved = saved;       // API sonucu ile güncelle
+          _loadingSaved = false;  // spinner kapat
+        });
+      }
+    } catch (e) {
+      // 3️⃣ Hata durumunda rollback
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;  // önceki duruma geri dön
+          _loadingSaved = false;
+        });
+      }
+
+      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+        SnackBar(content: Text("Kaydetme hatası: $e")),
+      );
+    }
+  }
   // ================= JOIN / LEAVE =================
   Future<void> _checkIfJoined() async {
-    final communityId = widget.post["communityId"];
+    final String communityId = widget.post["communityId"].toString();
     if (communityId == null) return;
 
     setState(() => _loadingJoin = true);
-    try {
-      final token = await _storage.read(key: "jwt_token");
-      final response = await ApiClient.dio.get(
-        "/api/communities/$communityId/is_joined",
-        options: Options(headers: {"Authorization": "Bearer $token"}),
-      );
 
-      final joined = response.data?["isJoined"] ?? false;
+    try {
+      final joined = await ApiService.isJoined(communityId);
 
       if (mounted) {
         setState(() {
@@ -73,37 +123,27 @@ class _PostCardState extends State<PostCard> {
   }
 
   Future<void> _toggleJoin() async {
-    final communityId = widget.post["communityId"];
+    final String communityId = widget.post["communityId"].toString();
     if (communityId == null) return;
 
     setState(() => _loadingJoin = true);
 
     try {
-      final token = await _storage.read(key: "jwt_token");
-
       if (_isJoined) {
-        // Ayrıl
-        await ApiClient.dio.delete(
-          "/api/communities/$communityId/leave",
-          options: Options(headers: {"Authorization": "Bearer $token"}),
-        );
-        if (mounted) setState(() => _isJoined = false);
-        ScaffoldMessenger.of(widget.parentContext)
-            .showSnackBar(const SnackBar(content: Text("Topluluktan ayrıldınız")));
+        await ApiService.leaveCommunity(communityId);
+        _isJoined = false;
       } else {
-        // Katıl
-        await ApiClient.dio.post(
-          "/api/communities/$communityId/join",
-          options: Options(headers: {"Authorization": "Bearer $token"}),
-        );
-        if (mounted) setState(() => _isJoined = true);
-        ScaffoldMessenger.of(widget.parentContext)
-            .showSnackBar(const SnackBar(content: Text("Topluluğa katıldınız")));
+        await ApiService.joinCommunity(communityId);
+        _isJoined = true;
       }
 
-      widget.onJoinCommunity?.call(widget.post["community"], widget.post["id"]);
+      if (mounted) setState(() {});
+
+      widget.onJoinCommunity?.call(
+        widget.post["community"],
+        widget.post["id"],
+      );
     } catch (e) {
-      if (mounted) setState(() => _loadingJoin = false);
       ScaffoldMessenger.of(widget.parentContext)
           .showSnackBar(SnackBar(content: Text("İşlem başarısız: $e")));
     } finally {
@@ -111,58 +151,8 @@ class _PostCardState extends State<PostCard> {
     }
   }
 
-  // ================= SAVED =================
-  Future<void> _checkIfSaved() async {
-    final postId = int.parse(widget.post["id"].toString());
 
-    try {
-      final token = await _storage.read(key: "jwt_token");
-      final response = await ApiClient.dio.get(
-        "/api/posts/save/is_saved/$postId",
-        options: Options(headers: {"Authorization": "Bearer $token"}),
-      );
 
-      final isSaved = response.data?["isSaved"] ?? false;
-
-      if (mounted) {
-        setState(() {
-          _isSaved = isSaved;
-          _loadingSaved = false;
-        });
-      }
-    } catch (e) {
-      debugPrint("Post kaydedilmiş mi kontrol hatası: $e");
-      if (mounted) setState(() => _loadingSaved = false);
-    }
-  }
-
-  Future<void> _toggleSave() async {
-    if (_loadingSaved) return;
-    final postId = int.parse(widget.post["id"].toString());
-    setState(() => _loadingSaved = true);
-
-    try {
-      final token = await _storage.read(key: "jwt_token");
-      final response = await ApiClient.dio.post(
-        "/api/posts/save",
-        data: {"postId": postId},
-        options: Options(headers: {"Authorization": "Bearer $token"}),
-      );
-
-      final saved = response.data?["saved"] ?? false;
-
-      if (mounted) {
-        setState(() {
-          _isSaved = saved;
-          _loadingSaved = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _loadingSaved = false);
-      ScaffoldMessenger.of(widget.parentContext)
-          .showSnackBar(SnackBar(content: Text("Kaydetme hatası: $e")));
-    }
-  }
 
   // ================= VIDEO THUMBNAIL =================
   Future<void> _generateVideoThumbnail() async {
@@ -357,19 +347,31 @@ class _PostCardState extends State<PostCard> {
                     );
                   },
                 ),
-                _loadingSaved
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : IconButton(
-                  icon: Icon(
-                    _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                    color: _isSaved ? Colors.orange : colors.onSurfaceVariant,
+                IconButton(
+                  onPressed: _loadingSaved ? null : _toggleSave,
+                  icon: AnimatedSwitcher(
+                    duration: Duration(milliseconds: 200),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: child,
+                    ),
+                    child: _loadingSaved
+                        ? SizedBox(
+                      key: ValueKey("spinner"),
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _isSaved ? Colors.orange : Colors.grey,
+                      ),
+                    )
+                        : Icon(
+                      _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      key: ValueKey("icon"),
+                      color: _isSaved ? Colors.orange : Colors.grey,
+                    ),
                   ),
-                  onPressed: _toggleSave,
-                ),
+                )
               ],
             ),
           ),
