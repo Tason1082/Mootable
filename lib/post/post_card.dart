@@ -6,6 +6,7 @@ import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
 import '../core/api_client.dart';
 import '../core/api_service.dart';
+import '../my_community/community_detail_page.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -268,11 +269,33 @@ class _PostCardState extends State<PostCard> {
               backgroundColor: colors.surfaceVariant,
               child: Icon(Icons.groups, color: colors.onSurfaceVariant),
             ),
-            title: Text(
-              "${post["username"] ?? "user"} • ${post["community"] ?? ""}",
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+            title: Row(
+              children: [
+                Text("${post["username"] ?? "user"} • "),
+
+                GestureDetector(
+                  onTap: () {
+                    final communityName = post["community"];
+                    if (communityName != null) {
+                      Navigator.push(
+                        widget.parentContext,
+                        MaterialPageRoute(
+                          builder: (_) => CommunityDetailPage(
+                            communityName: communityName,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(
+                    "${post["community"] ?? ""}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
             ),
             subtitle: Text(
               post["created_at"] != null

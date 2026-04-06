@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
+import '../core/api_service.dart';
 import '../post/post_card.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
@@ -26,7 +27,8 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   Map<String, dynamic>? community;
   bool isLoading = true;
   String? error;
-
+  bool _isJoined = false;
+  bool _loadingJoin = true;
   // 🔥 EKLENDİ (joinCommunity için gerekli)
   List<Map<String, dynamic>> posts = [];
 
@@ -35,7 +37,52 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     super.initState();
     fetchCommunity();
   }
+  Future<void> _checkIfJoined() async {
+    try {
+      final communityId = posts.isNotEmpty
+          ? posts[0]["communityId"].toString()
+          : null;
 
+      if (communityId == null) return;
+
+      final joined = await ApiService.isJoined(communityId);
+
+      if (mounted) {
+        setState(() {
+          _isJoined = joined;
+          _loadingJoin = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _loadingJoin = false);
+    }
+  }
+  Future<void> _toggleJoin() async {
+    final communityId = posts.isNotEmpty
+        ? posts[0]["communityId"].toString()
+        : null;
+
+    if (communityId == null) return;
+
+    setState(() => _loadingJoin = true);
+
+    try {
+      if (_isJoined) {
+        await ApiService.leaveCommunity(communityId);
+        _isJoined = false;
+      } else {
+        await ApiService.joinCommunity(communityId);
+        _isJoined = true;
+      }
+
+      setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("İşlem başarısız: $e")));
+    } finally {
+      if (mounted) setState(() => _loadingJoin = false);
+    }
+  }
   Future<void> fetchCommunity() async {
     setState(() => isLoading = true);
     try {
@@ -72,7 +119,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         error = e.toString();
         isLoading = false;
       });
-    }
+    }_checkIfJoined();
   }
 
   @override
@@ -152,14 +199,20 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                     const SizedBox(width: 4),
                     const Text("Haftalık 1 ziyaretçi"),
                     const Spacer(),
-                    ElevatedButton(
-                      onPressed: () {},
+                    _loadingJoin
+                        ? const SizedBox(
+                      width: 80,
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    )
+                        : ElevatedButton(
+                      onPressed: _toggleJoin,
                       style: ElevatedButton.styleFrom(
+                        backgroundColor: _isJoined ? Colors.grey[300] : null,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
                       ),
-                      child: const Text("Katıldın"),
+                      child: Text(_isJoined ? "Ayrıl" : "Katıl"),
                     ),
                   ],
                 ),

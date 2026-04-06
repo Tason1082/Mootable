@@ -13,7 +13,36 @@ class ApiService {
       return false;
     }
   }
+// ================= SAVED POSTS =================
 
+  static Future<List<Map<String, dynamic>>> getSavedPosts({
+    required int limit,
+    required int offset,
+  }) async {
+    try {
+      final response = await ApiClient.dio.get(
+        "/api/posts/save/me",
+        queryParameters: {
+          "limit": limit,
+          "offset": offset,
+        },
+      );
+
+      final List data = response.data;
+
+      return List<Map<String, dynamic>>.from(data)
+          .map((p) => {
+        ...p,
+        "votes_count": p["netScore"] ?? 0,
+        "user_vote": p["userVote"] ?? 0,
+        "created_at": p["createdAt"],
+      })
+          .toList();
+    } catch (e) {
+      print("ERROR getSavedPosts: $e");
+      return [];
+    }
+  }
   static Future<bool> toggleSavePost(int postId) async {
     try {
       final response = await ApiClient.dio.post(

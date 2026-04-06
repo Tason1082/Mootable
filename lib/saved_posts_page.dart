@@ -6,6 +6,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'core/api_client.dart';
 import 'package:dio/dio.dart';
 
+import 'core/api_service.dart';
+import 'home/home_page_functions.dart';
+
 class SavedPostsPage extends StatefulWidget {
   const SavedPostsPage({super.key});
 
@@ -64,23 +67,16 @@ class SavedPostsPageState extends State<SavedPostsPage> {
     setState(() => isLoadingMore = true);
 
     try {
-      final response = await ApiClient.dio.get(
-        "/api/posts/save/me",
-        queryParameters: {
-          "limit": limit,
-          "offset": offset,
-        },
+      final newPosts = await ApiService.getSavedPosts(
+        limit: limit,
+        offset: offset,
       );
-
-      final List data = response.data;
 
       if (!mounted) return;
 
-      if (data.isEmpty) {
+      if (newPosts.isEmpty) {
         hasMore = false;
       } else {
-        final newPosts = List<Map<String, dynamic>>.from(data);
-
         setState(() {
           if (loadMore) {
             posts.addAll(newPosts);
@@ -398,7 +394,9 @@ class _SavedPostsViewerState extends State<SavedPostsViewer> {
           return PostCard(
             post: post,
             parentContext: context,
-            onVote: (postId, vote) {},
+            onVote: (postId, vote) {
+              toggleVote(this, postId, vote);
+            },
 
             onJoinCommunity: (communityName, index) {},
           );
