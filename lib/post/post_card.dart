@@ -7,6 +7,7 @@ import '../comment/comment_page.dart';
 import '../core/api_client.dart';
 import '../core/api_service.dart';
 import '../my_community/community_detail_page.dart';
+import '../profile_page.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -271,7 +272,26 @@ class _PostCardState extends State<PostCard> {
             ),
             title: Row(
               children: [
-                Text("${post["username"] ?? "user"} • "),
+                GestureDetector(
+                  onTap: () {
+                    final username = post["username"];
+                    if (username != null) {
+                      Navigator.push(
+                        widget.parentContext,
+                        MaterialPageRoute(
+                          builder: (_) => ProfilePage(username: username),
+                        ),
+                      );
+                    }
+                  },
+                  child: Text(
+                    "${post["username"] ?? "user"} • ",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ),
 
                 GestureDetector(
                   onTap: () {

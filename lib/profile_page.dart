@@ -31,19 +31,13 @@ class _ProfilePageState extends State<ProfilePage>
 
   Future<void> _loadProfile() async {
     try {
-      final userId = await AuthService.getUserId();
-      print("PROFILE PAGE USER ID -> $userId");
+      final userRes = await ApiClient.dio.get(
+        '/api/users/username/${widget.username}',
+      );
 
-      if (userId == null) {
-        print("USER ID NULL");
-        setState(() => loading = false);
-        return;
-      }
-
-      final userRes = await ApiClient.dio.get('/api/users/$userId');
-      print("USER RESPONSE -> ${userRes.data}");
-
-final postRes = await ApiClient.dio.get('/api/posts/me');print("POST RESPONSE -> ${postRes.data}");
+      final postRes = await ApiClient.dio.get(
+        '/api/posts/user/${widget.username}',
+      );
 
       final raw = List<Map<String, dynamic>>.from(postRes.data);
 
@@ -64,9 +58,7 @@ final postRes = await ApiClient.dio.get('/api/posts/me');print("POST RESPONSE ->
         posts = mappedPosts;
         loading = false;
       });
-    } catch (e, st) {
-      print("PROFILE ERROR -> $e");
-      print(st);
+    } catch (e) {
       setState(() => loading = false);
     }
   }
@@ -176,25 +168,7 @@ final postRes = await ApiClient.dio.get('/api/posts/me');print("POST RESPONSE ->
               ),
 
               // Düzenle butonu
-              OutlinedButton(
-                onPressed: () async {
-                  final updated = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => EditProfilePage(
-                        initialUsername: user?['username'],
-                        initialBio: user?['bio'],
-                      ),
-                    ),
-                  );
 
-                  // 🔥 geri dönünce refresh
-                  if (updated == true) {
-                    _loadProfile();
-                  }
-                },
-                child: const Text("Düzenle"),
-              ),
             ],
           ),
 
