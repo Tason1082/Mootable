@@ -29,6 +29,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   String? error;
   bool _isJoined = false;
   bool _loadingJoin = true;
+  List<Map<String, dynamic>> filteredPosts = [];
+  TextEditingController searchController = TextEditingController();
+  bool isSearching = false;
   // 🔥 EKLENDİ (joinCommunity için gerekli)
   List<Map<String, dynamic>> posts = [];
 
@@ -36,6 +39,18 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   void initState() {
     super.initState();
     fetchCommunity();
+  }
+  void _filterPosts(String query) {
+    final lowerQuery = query.toLowerCase();
+
+    final results = posts.where((post) {
+      final content = (post["content"] ?? "").toString().toLowerCase();
+      return content.contains(lowerQuery);
+    }).toList();
+
+    setState(() {
+      filteredPosts = results;
+    });
   }
   Future<void> _checkIfJoined() async {
     try {
@@ -106,12 +121,15 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       }).toList();
 
       setState(() {
-        posts = mappedPosts; // 🔥 önemli
+        posts = mappedPosts;
+        filteredPosts = mappedPosts; // 🔥 BURAYA EKLİYORSUN
+
         community = {
           'name': widget.communityName,
           'description': 'Community description',
           'posts': mappedPosts,
         };
+
         isLoading = false;
       });
     } catch (e) {
@@ -141,7 +159,17 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       appBar: AppBar(
         leading: const BackButton(),
         titleSpacing: 0,
-        title: Row(
+        title: isSearching
+            ? TextField(
+          controller: searchController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: "Post ara...",
+            border: InputBorder.none,
+          ),
+          onChanged: _filterPosts,
+        )
+            : Row(
           children: [
             CircleAvatar(
               radius: 16,
@@ -160,13 +188,24 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
             ),
           ],
         ),
-        actions: const [
-          Icon(Icons.search),
-          SizedBox(width: 12),
-          Icon(Icons.share),
-          SizedBox(width: 12),
-          Icon(Icons.more_vert),
-          SizedBox(width: 8),
+        actions: [
+          IconButton(
+            icon: Icon(isSearching ? Icons.close : Icons.search),
+            onPressed: () {
+              setState(() {
+                if (isSearching) {
+                  searchController.clear();
+                  filteredPosts = posts;
+                }
+                isSearching = !isSearching;
+              });
+            },
+          ),
+          const SizedBox(width: 12),
+          const Icon(Icons.share),
+          const SizedBox(width: 12),
+          const Icon(Icons.more_vert),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -225,9 +264,9 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           // POSTS
           Expanded(
             child: ListView.builder(
-              itemCount: posts.length,
+              itemCount: filteredPosts.length, // 🔥 BURASI
               itemBuilder: (context, index) {
-                final post = posts[index];
+                final post = filteredPosts[index]; // 🔥 BURASI
 
                 return PostCard(
                   post: post,
