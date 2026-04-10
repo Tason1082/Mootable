@@ -101,7 +101,12 @@ class WebRTCVoiceService {
     await pc.setLocalDescription(answer);
     return answer.sdp!;
   }
-
+  Future<void> removePeer(String userId) async {
+    if (_peers.containsKey(userId)) {
+      await _peers[userId]?.close();
+      _peers.remove(userId);
+    }
+  }
   /// Offer handle
   Future<void> handleOffer(String userId, String sdp) async {
     final pc = _peers[userId]!;

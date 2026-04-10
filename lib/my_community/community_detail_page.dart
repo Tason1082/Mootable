@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
@@ -52,6 +54,14 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       filteredPosts = results;
     });
   }
+  void _shareCommunity() {
+    final url = "https://mootable.com/r/${widget.communityName}";
+
+    Share.share(
+      "Bu community'ye bak 👇\n$url",
+    );
+  }
+  
   Future<void> _checkIfJoined() async {
     try {
       final communityId = posts.isNotEmpty
@@ -202,7 +212,10 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
             },
           ),
           const SizedBox(width: 12),
-          const Icon(Icons.share),
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: _shareCommunity,
+          ),
           const SizedBox(width: 12),
           const Icon(Icons.more_vert),
           const SizedBox(width: 8),

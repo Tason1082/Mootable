@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:mootable/voice/voice_manager.dart';
 
 import '../../voice/voice_service.dart';
 import '../../voice/voice_signalr.dart';
@@ -24,6 +25,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
 
   final WebRTCVoiceService webrtc = WebRTCVoiceService();
   final VoiceSignalR signalR = VoiceSignalR();
+
   final Map<String, RTCVideoRenderer> _audioRenderers = {};
   final Map<String, RTCVideoRenderer> _renderers = {};
 
@@ -45,7 +47,24 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
     myUserId = await AuthService.getUserId();
     print("[DEBUG] MY USER ID -> $myUserId");
   }
+  Future<void> leaveRoom() async {
+    try {
+      logDebug("Odadan çıkılıyor...");
 
+      /// 🔥 Önce backend'e bildir
+      await VoiceService.leaveRoom(widget.roomId);
+
+      /// 🔌 Sonra bağlantıları kapat
+      await webrtc.dispose();
+      await signalR.disconnect();
+
+      if (mounted) {
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      logDebug("Leave error -> $e");
+    }
+  }
   Future<void> loadMembers() async {
     try {
       final data = await VoiceService.getMembers(widget.roomId);
@@ -181,7 +200,18 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
         }
       }
     };
+    signalR.onUserLeft = (userId) {
+      userId = normalize(userId);
 
+      logDebug("USER LEFT -> $userId");
+
+      setState(() {
+        members.removeWhere((m) => normalize(m) == userId);
+      });
+
+      /// Peer temizle (çok önemli)
+      webrtc.removePeer(userId);
+    };
     /// ODAYA KATIL
     logDebug("Odaya katılınıyor -> ${widget.roomId}");
     await signalR.joinRoom(widget.roomId.toString());
@@ -293,6 +323,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                /// 🎤 Mikrofon
                 IconButton(
                   iconSize: 32,
                   icon: Icon(
@@ -304,6 +335,17 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                       micOn = !micOn;
                     });
                     webrtc.toggleMic(micOn);
+                  },
+                ),
+
+                const SizedBox(width: 24),
+
+                /// 🚪 Ayrıl
+                IconButton(
+                  iconSize: 32,
+                  icon: const Icon(Icons.call_end, color: Colors.red),
+                  onPressed: () async {
+                    await leaveRoom();
                   },
                 ),
               ],

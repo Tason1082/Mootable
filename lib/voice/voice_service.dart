@@ -17,6 +17,12 @@ class VoiceService {
 
     return response.data;
   }
+  /// 🚪 Odadan çık
+  static Future<void> leaveRoom(int roomId) async {
+    await ApiClient.dio.post(
+      "/api/voice/leave/$roomId",
+    );
+  }
   /// 📋 Kullanıcının odalarını getir
   static Future<List<dynamic>> getMyRooms() async {
     final response =
