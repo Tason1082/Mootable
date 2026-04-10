@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mootable/voice/voice_manager.dart';
+import 'package:mootable/voice/voice_service.dart';
 
-import '../../voice/voice_service.dart';
-import '../../voice/voice_signalr.dart';
-import '../../voice/webrtc_voice_service.dart';
 import '../core/auth_service.dart';
+
+
 
 class VoiceRoomPage extends StatefulWidget {
   final int roomId;
@@ -20,12 +20,10 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
   bool loading = true;
   List<String> members = [];
 
-  bool micOn = true;
   String? myUserId;
 
-  final WebRTCVoiceService webrtc = WebRTCVoiceService();
-  final VoiceSignalR signalR = VoiceSignalR();
 
+  final voiceManager = VoiceManager();
   final Map<String, RTCVideoRenderer> _audioRenderers = {};
   final Map<String, RTCVideoRenderer> _renderers = {};
 
@@ -33,6 +31,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
   void initState() {
     super.initState();
     initAll();
+    VoiceManager().micOn.value = true;
   }
 
   String normalize(String v) => v.trim().toLowerCase();
@@ -40,7 +39,13 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
   Future<void> initAll() async {
     await initUser();
     await loadMembers();
-    await initVoice();
+    if (!voiceManager.initialized) {
+      await voiceManager.init(
+        roomId: widget.roomId,
+        userId: myUserId!,
+        initialMembers: members,
+      );
+    }
   }
 
   Future<void> initUser() async {
@@ -55,9 +60,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
       await VoiceService.leaveRoom(widget.roomId);
 
       /// 🔌 Sonra bağlantıları kapat
-      await webrtc.dispose();
-      await signalR.disconnect();
-
+      await voiceManager.leave();
       if (mounted) {
         Navigator.pop(context);
       }
@@ -100,140 +103,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
     return normalize(myUserId!).compareTo(normalize(otherUserId)) < 0;
   }
 
-  Future<void> initVoice() async {
-    logDebug("WebRTC başlatılıyor...");
-    await webrtc.init();
 
-    logDebug("SignalR bağlanıyor...");
-    await signalR.connect();
-
-    final myId = normalize(myUserId ?? "");
-
-    // Mikrofon durumunu başlat
-    webrtc.toggleMic(micOn);
-    logDebug("Mic durumu: $micOn");
-    webrtc.onAnswerCreated = (userId, sdp) {
-      print("ANSWER OLUŞTU -> $userId");
-      signalR.sendAnswer(widget.roomId.toString(), sdp);
-    };
-
-    /// REMOTE STREAM (sadece audio)
-    webrtc.onRemoteStream = (userId, stream) async {
-      print("REMOTE STREAM TRACKS: ${stream.getTracks().length}");
-      print("AUDIO TRACKS: ${stream.getAudioTracks().length}");
-
-      if (stream.getAudioTracks().isNotEmpty) {
-        for (var track in stream.getAudioTracks()) {
-          track.enabled = true; // audio çalması için
-          print("Audio track aktif edildi -> ${track.id} | user: $userId");
-        }
-        setState(() {}); // sadece UI güncellemesi için
-        print("REMOTE AUDIO BAĞLANDI -> $userId");
-      }
-    };
-
-    /// LOCAL ICE -> SERVER
-    webrtc.onIceCandidate = (userId, candidate, mid, index) {
-      userId = normalize(userId);
-      logDebug("ICE CANDIDATE -> $userId | mid: $mid | index: $index");
-
-      signalR.sendIce(
-        widget.roomId.toString(),
-        candidate,
-        mid,
-        index,
-      );
-    };
-
-    /// OFFER GELDİ
-    signalR.onOffer = (roomId, offer, userId) async {
-      userId = normalize(userId);
-      if (userId == myId) return;
-
-      logDebug("OFFER GELDİ -> from $userId");
-
-      if (!webrtc.hasPeer(userId)) {
-        logDebug("Peer oluşturuluyor -> $userId | polite:true");
-        await webrtc.createPeer(userId, polite: true);
-      }
-
-      await webrtc.handleOffer(userId, offer);
-      logDebug("Offer handle tamamlandı -> $userId");
-    };
-
-    /// ANSWER GELDİ
-    signalR.onAnswer = (roomId, answer, userId) async {
-      userId = normalize(userId);
-      if (userId == myId) return;
-
-      logDebug("ANSWER GELDİ -> from $userId");
-
-      await webrtc.handleAnswer(userId, answer);
-      logDebug("Answer handle tamamlandı -> $userId");
-    };
-
-    /// ICE GELDİ
-    signalR.onIce = (roomId, candidate, userId, mid, index) async {
-      userId = normalize(userId);
-      if (userId == myId) return;
-
-      if (!webrtc.hasPeer(userId)) {
-        logDebug("Peer oluşturuluyor ICE için -> $userId");
-        await webrtc.createPeer(userId, polite: false);
-      }
-
-      await webrtc.addIce(userId, candidate, mid, index);
-      logDebug("ICE eklendi -> $userId");
-    };
-
-    /// YENİ USER
-    signalR.onUserJoined = (connectionId) async {
-      final user = normalize(connectionId);
-
-      if (!webrtc.hasPeer(user)) {
-        print("Yeni peer oluşturuluyor -> $user");
-        await webrtc.createPeer(user, polite: false);
-
-        if (_shouldSendOffer(user)) {
-          final offer = await webrtc.createOffer(user);
-          signalR.sendOffer(widget.roomId.toString(), offer);
-        }
-      }
-    };
-    signalR.onUserLeft = (userId) {
-      userId = normalize(userId);
-
-      logDebug("USER LEFT -> $userId");
-
-      setState(() {
-        members.removeWhere((m) => normalize(m) == userId);
-      });
-
-      /// Peer temizle (çok önemli)
-      webrtc.removePeer(userId);
-    };
-    /// ODAYA KATIL
-    logDebug("Odaya katılınıyor -> ${widget.roomId}");
-    await signalR.joinRoom(widget.roomId.toString());
-    logDebug("Odaya katılım tamamlandı");
-
-    /// MEVCUT USERLAR (sadece offer göndermek için)
-    for (var user in members) {
-      final otherUser = normalize(user);
-      if (otherUser == myId) continue;
-
-      if (_shouldSendOffer(otherUser)) {
-        if (!webrtc.hasPeer(otherUser)) {
-          logDebug("Peer oluşturuluyor -> $otherUser");
-          await webrtc.createPeer(otherUser, polite: false);
-        }
-
-        final offer = await webrtc.createOffer(otherUser);
-        logDebug("Offer gönderiliyor -> $otherUser");
-        signalR.sendOffer(widget.roomId.toString(), offer);
-      }
-    }
-  }
 
 // Helper debug fonksiyonu
   void logDebug(String message) {
@@ -243,9 +113,6 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
 
   @override
   void dispose() {
-    webrtc.dispose();
-    signalR.disconnect();
-
     for (var r in _renderers.values) {
       r.dispose();
     }
@@ -253,104 +120,122 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
     for (var r in _audioRenderers.values) {
       r.dispose();
     }
+
     super.dispose();
   }
 
   @override
+
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Oda ${widget.roomId}")),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Expanded(
-              child: GridView.builder(
-                itemCount: members.length,
-                gridDelegate:
-                const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1,
-                ),
-                itemBuilder: (context, index) {
-                  final user = members[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4B5CFF),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const CircleAvatar(
-                          radius: 28,
-                          backgroundColor: Colors.white,
-                          child: Icon(Icons.person),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          user,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(title: Text("Oda ${widget.roomId}")),
+        body: loading
+            ? const Center(child: CircularProgressIndicator())
+            : Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              /// 👥 USER GRID
+              Expanded(
+                child: ValueListenableBuilder<List<String>>(
+                  valueListenable: VoiceManager().members,
+                  builder: (context, members, _) {
+                    return GridView.builder(
+                      itemCount: members.length,
+                      gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1,
+                      ),
+                      itemBuilder: (context, index) {
+                        final user = members[index];
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4B5CFF),
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                        )
-                      ],
-                    ),
-                  );
-                },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const CircleAvatar(
+                                radius: 28,
+                                backgroundColor: Colors.white,
+                                child: Icon(Icons.person),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                user,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              )
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
 
-            /// Görünmez audio renderer
-            ..._renderers.values
-                .map((r) => SizedBox(
-              width: 0,
-              height: 0,
-              child: RTCVideoView(r),
-            )),
-            ..._audioRenderers.values.map((r) => SizedBox(
-              width: 0,
-              height: 0,
-              child: RTCVideoView(r),
-            )),
-            const SizedBox(height: 12),
+              /// 🔇 INVISIBLE AUDIO RENDERERS
+              ..._renderers.values.map((r) => SizedBox(
+                width: 0,
+                height: 0,
+                child: RTCVideoView(r),
+              )),
+              ..._audioRenderers.values.map((r) => SizedBox(
+                width: 0,
+                height: 0,
+                child: RTCVideoView(r),
+              )),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                /// 🎤 Mikrofon
-                IconButton(
-                  iconSize: 32,
-                  icon: Icon(
-                    micOn ? Icons.mic : Icons.mic_off,
-                    color: micOn ? Colors.black : Colors.red,
+              const SizedBox(height: 12),
+
+              /// 🎮 CONTROLS
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+
+                  /// 🎤 BURAYA KOY
+                  ValueListenableBuilder<bool>(
+                    valueListenable: VoiceManager().micOn,
+                    builder: (_, micOn, __) {
+                      return IconButton(
+                        iconSize: 32,
+                        icon: Icon(
+                          micOn ? Icons.mic : Icons.mic_off,
+                          color: micOn ? Colors.black : Colors.red,
+                        ),
+                        onPressed: () {
+                          VoiceManager().toggleMic();
+                        },
+                      );
+                    },
                   ),
-                  onPressed: () {
-                    setState(() {
-                      micOn = !micOn;
-                    });
-                    webrtc.toggleMic(micOn);
-                  },
-                ),
 
-                const SizedBox(width: 24),
+                  const SizedBox(width: 24),
 
-                /// 🚪 Ayrıl
-                IconButton(
-                  iconSize: 32,
-                  icon: const Icon(Icons.call_end, color: Colors.red),
-                  onPressed: () async {
-                    await leaveRoom();
-                  },
-                ),
-              ],
-            ),
-          ],
+                  /// 🚪 Ayrıl (aynı kalır)
+                  IconButton(
+                    iconSize: 32,
+                    icon: const Icon(Icons.call_end, color: Colors.red),
+                    onPressed: () async {
+                      await leaveRoom();
+                    },
+                  ),
+                ],
+              )
+            ],
+          ),
         ),
       ),
     );
