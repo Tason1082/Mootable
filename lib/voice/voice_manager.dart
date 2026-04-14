@@ -94,7 +94,7 @@ class VoiceManager {
     };
 
     signalR.onUserJoined = (id) async {
-      final user = normalize(id);
+      final user = normalize(id.toString());
 
       if (!members.value.contains(user)) {
         members.value = [...members.value, user];

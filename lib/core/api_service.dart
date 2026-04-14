@@ -14,7 +14,17 @@ class ApiService {
     }
   }
 // ================= SAVED POSTS =================
+// ================= USERS =================
 
+  static Future<Map<String, dynamic>?> getUserById(String userId) async {
+    try {
+      final response = await ApiClient.dio.get("/api/users/$userId");
+      return response.data;
+    } catch (e) {
+      print("ERROR getUserById: $e");
+      return null;
+    }
+  }
   static Future<List<Map<String, dynamic>>> getSavedPosts({
     required int limit,
     required int offset,

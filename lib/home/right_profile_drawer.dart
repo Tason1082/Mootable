@@ -4,6 +4,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/auth_service.dart';
 import '../core/api_client.dart';
 
+import '../edit_profile_page.dart';
 import '../profile_page.dart';
 import '../saved_posts_page.dart';
 import '../settings_page.dart';
@@ -143,14 +144,19 @@ class _RightProfileDrawerState extends State<RightProfileDrawer> {
                 title: loc.editProfile,
                 onTap: () async {
                   Navigator.pop(context);
+
                   final updated = await Navigator.of(context, rootNavigator: true)
                       .push(MaterialPageRoute(
-                    builder: (_) => ProfilePage(
-                      username: username!,
-
+                    builder: (_) => EditProfilePage(
+                      initialUsername: username,
+                      initialBio: bio,
                     ),
                   ));
-                  if (updated == true) _fetchUserProfile();
+
+                  if (updated == true) {
+                    _fetchUserProfile();
+                    widget.refreshProfile();
+                  }
                 },
               ),
               _menuTile(

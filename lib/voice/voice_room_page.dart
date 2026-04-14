@@ -3,6 +3,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mootable/voice/voice_manager.dart';
 import 'package:mootable/voice/voice_service.dart';
 
+import '../core/api_service.dart';
 import '../core/auth_service.dart';
 
 
@@ -19,7 +20,7 @@ class VoiceRoomPage extends StatefulWidget {
 class _VoiceRoomPageState extends State<VoiceRoomPage> {
   bool loading = true;
   List<String> members = [];
-
+  Map<String, String> usernames = {};
   String? myUserId;
 
 
@@ -71,16 +72,36 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
   Future<void> loadMembers() async {
     try {
       final data = await VoiceService.getMembers(widget.roomId);
+
+      Map<String, String> tempUsernames = {};
+
+      for (var userId in data) {
+        final user = await ApiService.getUserById(userId);
+
+        tempUsernames[userId] = user?["username"] ?? "Unknown";
+      }
+
       setState(() {
         members = data;
+        usernames = tempUsernames;
         loading = false;
       });
+
     } catch (e) {
       print("[DEBUG] Load members error -> $e");
       setState(() => loading = false);
     }
   }
+  void syncUsernames(List<String> membersList) async {
+    for (var userId in membersList) {
+      if (!usernames.containsKey(userId)) {
+        final user = await ApiService.getUserById(userId);
+        usernames[userId] = user?["username"] ?? "Unknown";
+      }
+    }
 
+    setState(() {});
+  }
   Future<void> _initRenderer(String userId, MediaStream stream) async {
     if (stream.getVideoTracks().isNotEmpty) {
       if (!_renderers.containsKey(userId)) {
@@ -145,6 +166,11 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                 child: ValueListenableBuilder<List<String>>(
                   valueListenable: VoiceManager().members,
                   builder: (context, members, _) {
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      syncUsernames(members);
+                    });
+
                     return GridView.builder(
                       itemCount: members.length,
                       gridDelegate:
@@ -171,7 +197,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                user,
+                                usernames[user] ?? user,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
