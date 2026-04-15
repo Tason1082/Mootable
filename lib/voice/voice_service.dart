@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:http/http.dart';
 import '../core/api_client.dart';
+import '../core/api_service.dart';
 
 class VoiceService {
 
@@ -16,6 +18,12 @@ class VoiceService {
     );
 
     return response.data;
+  }
+  /// 🗑️ Odayı sil
+  static Future<void> deleteRoom(int roomId) async {
+    await ApiClient.dio.delete(
+      "/api/voice/$roomId",
+    );
   }
   /// 🚪 Odadan çık
   static Future<void> leaveRoom(int roomId) async {
@@ -64,4 +72,6 @@ class VoiceService {
 
     return List<String>.from(response.data);
   }
+
+
 }

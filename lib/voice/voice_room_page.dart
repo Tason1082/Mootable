@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:mootable/voice/voice_manager.dart';
 import 'package:mootable/voice/voice_service.dart';
 
 import '../core/api_service.dart';
 import '../core/auth_service.dart';
+import '../profile_page.dart';
 
 
 
@@ -154,7 +156,93 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
         return false;
       },
       child: Scaffold(
-        appBar: AppBar(title: Text("Oda ${widget.roomId}")),
+        appBar: AppBar(
+          title: Text("Oda ${widget.roomId}"),
+          actions: [
+            PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == "delete") {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Odayı Sil"),
+                      content: const Text(
+                          "Bu odayı silmek istediğine emin misin?"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text("İptal"),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text("Sil",
+                              style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true) {
+                    try {
+                      await VoiceService.deleteRoom(widget.roomId);
+
+                      /// bağlantıyı kapat
+                      await voiceManager.leave();
+
+                      if (mounted) {
+                        Navigator.pop(context);
+                      }
+                    } catch (e) {
+                      logDebug("Delete error -> $e");
+                    }
+                  }
+                }
+                if (value == "invite") {
+                  try {
+                    final code = await VoiceService.createInvite(widget.roomId);
+
+                    if (!mounted) return;
+
+                    showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text("Davet Kodu"),
+                        content: SelectableText(code), // 🔥 SADECE CODE
+                        actions: [
+                          TextButton(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: code));
+                            },
+                            child: const Text("Kopyala"),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Kapat"),
+                          ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    logDebug("Invite error -> $e");
+                  }
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: "invite",
+                  child: Text("Davet oluştur"),
+                ),
+                const PopupMenuItem(
+                  value: "delete",
+                  child: Text(
+                    "Odayı Sil",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
         body: loading
             ? const Center(child: CircularProgressIndicator())
             : Padding(
@@ -166,7 +254,6 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                 child: ValueListenableBuilder<List<String>>(
                   valueListenable: VoiceManager().members,
                   builder: (context, members, _) {
-
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       syncUsernames(members);
                     });
@@ -182,28 +269,49 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                       ),
                       itemBuilder: (context, index) {
                         final user = members[index];
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4B5CFF),
+
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const CircleAvatar(
-                                radius: 28,
-                                backgroundColor: Colors.white,
-                                child: Icon(Icons.person),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                usernames[user] ?? user,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                            onTap: () {
+                              final username =
+                                  usernames[user] ?? user;
+
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProfilePage(
+                                    username: username,
+                                  ),
                                 ),
-                              )
-                            ],
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4B5CFF),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                mainAxisAlignment:
+                                MainAxisAlignment.center,
+                                children: [
+                                  const CircleAvatar(
+                                    radius: 28,
+                                    backgroundColor: Colors.white,
+                                    child: Icon(Icons.person),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    usernames[user] ?? user,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
                           ),
                         );
                       },
@@ -230,8 +338,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-
-                  /// 🎤 BURAYA KOY
+                  /// 🎤 MIC
                   ValueListenableBuilder<bool>(
                     valueListenable: VoiceManager().micOn,
                     builder: (_, micOn, __) {
@@ -239,7 +346,8 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                         iconSize: 32,
                         icon: Icon(
                           micOn ? Icons.mic : Icons.mic_off,
-                          color: micOn ? Colors.black : Colors.red,
+                          color:
+                          micOn ? Colors.black : Colors.red,
                         ),
                         onPressed: () {
                           VoiceManager().toggleMic();
@@ -250,10 +358,11 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
 
                   const SizedBox(width: 24),
 
-                  /// 🚪 Ayrıl (aynı kalır)
+                  /// 🚪 LEAVE
                   IconButton(
                     iconSize: 32,
-                    icon: const Icon(Icons.call_end, color: Colors.red),
+                    icon: const Icon(Icons.call_end,
+                        color: Colors.red),
                     onPressed: () async {
                       await leaveRoom();
                     },

@@ -118,6 +118,15 @@ class VoiceManager {
 
       webrtc.removePeer(user);
     };
+    signalR.onRoomDeleted = (roomId) async {
+      final id = int.tryParse(roomId.toString());
+
+      if (id != this.roomId) return;
+
+      // 🔥 tüm bağlantıları kapat
+      await leave();
+    };
+
   }
 
   // ================= LOGIC =================

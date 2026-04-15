@@ -12,11 +12,12 @@ class VoiceSignalR {
   Function(String roomId, String candidate, String userId, String sdpMid, int sdpIndex)? onIce;
   Function(String connectionId)? onUserJoined;
   Function(String userId)? onUserLeft;
+  Function(dynamic roomId)? onRoomDeleted;
   /// Bağlantıyı başlat (retry + timeout destekli)
   Future<void> connect({int retries = 3, Duration timeout = const Duration(seconds: 10)}) async {
     connection = HubConnectionBuilder()
         .withUrl(
-      "http://192.168.0.33:5004/voicehub",
+      "http://192.168.0.25:5004/voicehub",
       options: HttpConnectionOptions(
         accessTokenFactory: () async {
           final token = await AuthService.getToken();
@@ -68,7 +69,11 @@ class VoiceSignalR {
     connection.onclose(({Exception? error}) {
       print("[SignalR] Connection closed -> $error");
     });
-
+    connection.on("RoomDeleted", (args) {
+      if (onRoomDeleted != null) {
+        onRoomDeleted!(args![0]);
+      }
+    });
     // Retry ve timeout ile bağlantı başlat
     int attempt = 0;
     while (attempt < retries) {
