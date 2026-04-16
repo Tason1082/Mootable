@@ -10,7 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/api_client.dart';
 import 'splash_page.dart';
-import 'error_handler.dart';
+import 'error/error_handler.dart';
 
 Future<void> main() async {
   runZonedGuarded(() async {

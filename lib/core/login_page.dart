@@ -8,7 +8,7 @@ import 'package:mootable/core/register_page.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
-import '../error_handler.dart';
+import '../error/error_handler.dart';
 import '../home/home_page.dart';
 
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';

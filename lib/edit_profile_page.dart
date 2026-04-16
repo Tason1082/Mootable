@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/auth_service.dart';
 import '../core/api_client.dart';
-import '../error_handler.dart';
+import 'error/error_handler.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String? initialUsername;
@@ -52,12 +52,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final l10n = AppLocalizations.of(context)!;
 
     try {
+      final Map<String, dynamic> data = {};
+
+      final username = _usernameController.text.trim();
+      final bio = _bioController.text.trim();
+
+      // sadece doluysa gönder
+      if (username.isNotEmpty) {
+        data['username'] = username;
+      }
+
+      // bio boş olsa bile null yerine gönderilebilir (backend kararına bağlı)
+      data['bio'] = bio;
+
       await ApiClient.dio.put(
         '/api/users/$userId',
-        data: {
-          'username': _usernameController.text.trim(),
-          'bio': _bioController.text.trim(),
-        },
+        data: data,
       );
 
       if (mounted) {
@@ -68,7 +78,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       }
     } catch (e, st) {
       if (!mounted) return;
+
       ErrorHandler.showError(context, e, stackTrace: st);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(l10n.profile_saved_error)),
@@ -78,7 +90,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (mounted) setState(() => _saving = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;

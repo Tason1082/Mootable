@@ -1,39 +1,50 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 
+import 'api_error.dart';
+
 class ErrorHandler {
   static String getErrorMessage(dynamic error) {
-    // ✅ STRING
-    if (error is String) {
-      return error;
+
+    /// ✅ BACKEND ERROR (EN ÖNEMLİ)
+    if (error is ApiError) {
+      // Validation
+      if (error.errors != null && error.errors!.isNotEmpty) {
+        return error.errors!.values.first.first;
+      }
+
+      // Direkt backend mesajı
+      if (error.message != null && error.message!.isNotEmpty) {
+        return error.message!;
+      }
     }
 
-    // ✅ HTTP STATUS CODE
+    /// ✅ DIO RESPONSE (varsa)
+    if (error is DioException && error.response != null) {
+      final data = error.response!.data;
+
+      if (data is Map<String, dynamic>) {
+        final apiError = ApiError.fromJson(data);
+        return getErrorMessage(apiError);
+      }
+    }
+
+    /// ✅ HTTP STATUS (fallback)
     if (error is int) {
-      // AUTH
-      if (error == 401) {
-        return 'E-posta veya şifre yanlış.';
-      }
-
-      // YETKİ
-      if (error == 403) {
-        return 'Bu işlem için yetkiniz yok.';
-      }
-
-      // CLIENT HATALARI
+      if (error == 401) return 'E-posta veya şifre yanlış.';
+      if (error == 403) return 'Bu işlem için yetkiniz yok.';
       if (error >= 400 && error < 500) {
-        return 'İstek hatalı. Lütfen bilgileri kontrol edin.';
+        return 'İstek hatalı.';
       }
-
-      // SERVER HATALARI
-      if (error >= 500 && error < 600) {
-        return 'Sunucu hatası. Lütfen daha sonra tekrar deneyin.';
+      if (error >= 500) {
+        return 'Sunucu hatası.';
       }
     }
 
-    // ✅ NETWORK
+    /// ✅ NETWORK
     if (error is SocketException) {
       return 'İnternet bağlantısı hatası.';
     }
@@ -42,21 +53,7 @@ class ErrorHandler {
       return 'Sunucu yanıt vermiyor.';
     }
 
-    // ✅ GENEL EXCEPTION
-    if (error is Exception) {
-      final message = error
-          .toString()
-          .replaceFirst('Exception: ', '');
-
-      if (message.toLowerCase().contains('too many requests')) {
-        return 'Çok fazla istek gönderildi. Lütfen bekleyin.';
-      }
-
-      return message.isNotEmpty
-          ? message
-          : 'Beklenmeyen bir hata oluştu.';
-    }
-
+    /// ✅ DEFAULT
     return 'Beklenmeyen bir hata oluştu.';
   }
 

@@ -9,7 +9,7 @@ import '../profile_page.dart';
 import '../saved_posts_page.dart';
 import '../settings_page.dart';
 import '../core/login_page.dart';
-import '../error_handler.dart';
+import '../error/error_handler.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 

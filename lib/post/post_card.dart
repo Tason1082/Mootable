@@ -6,11 +6,14 @@ import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
 import '../core/api_client.dart';
 import '../core/api_service.dart';
+import 'full_screen_image.dart';
 import '../my_community/community_detail_page.dart';
 import '../profile_page.dart';
 import '../quote_post_page.dart';
 import '../video_player_widget.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+
+import 'inline_video_player.dart';
 
 class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -32,7 +35,7 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
-  Uint8List? videoThumbnail;
+
   bool _isSaved = false;
   bool _loadingSaved = true;
   bool _isJoined = false;
@@ -43,7 +46,7 @@ class _PostCardState extends State<PostCard> {
   @override
   void initState() {
     super.initState();
-    _generateVideoThumbnail();
+
     _checkIfSaved();
     _checkIfJoined(); // sayfa açılır açılmaz katılım kontrolü
   }
@@ -157,94 +160,53 @@ class _PostCardState extends State<PostCard> {
 
 
   // ================= VIDEO THUMBNAIL =================
-  Future<void> _generateVideoThumbnail() async {
-    final url = widget.post["imageUrl"] ?? widget.post["image_url"];
-    if (url == null) return;
-    final path = Uri.parse(url).path.toLowerCase();
 
-    if (path.endsWith(".mp4") ||
-        path.endsWith(".mov") ||
-        path.endsWith(".avi") ||
-        path.endsWith(".webm")) {
-      final thumb = await VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 400,
-        quality: 75,
-      );
-      if (!mounted) return;
-      setState(() => videoThumbnail = thumb);
-    }
-  }
 
   // ================= MEDIA WIDGET =================
   Widget _buildMediaWidget(String? url) {
     if (url == null) return const SizedBox.shrink();
+
     final path = Uri.parse(url).path.toLowerCase();
 
+    // ================= VIDEO =================
     if (path.endsWith(".mp4") ||
         path.endsWith(".mov") ||
         path.endsWith(".avi") ||
         path.endsWith(".webm")) {
-      if (videoThumbnail == null) {
-        return const AspectRatio(
-          aspectRatio: 1,
-          child: Center(child: CircularProgressIndicator()),
-        );
-      }
+
+      return InlineVideoPlayer(url: url);
+    }
+
+    // ================= IMAGE =================
+    if (path.endsWith(".jpg") ||
+        path.endsWith(".jpeg") ||
+        path.endsWith(".png") ||
+        path.endsWith(".gif")) {
 
       return GestureDetector(
         onTap: () {
           Navigator.push(
             widget.parentContext,
             MaterialPageRoute(
-              builder: (_) => VideoPlayerWidget(videoUrl: url),
+              builder: (_) => FullScreenImagePage(imageUrl: url),
             ),
           );
         },
         child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.memory(
-                videoThumbnail!,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-              Container(
-                decoration: const BoxDecoration(
-                  color: Colors.black45,
-                  shape: BoxShape.circle,
-                ),
-                child: const Padding(
-                  padding: EdgeInsets.all(8.0),
-                  child: Icon(Icons.play_arrow, color: Colors.white, size: 40),
-                ),
-              ),
-            ],
+          aspectRatio: 7 / 8,
+          child: Image.network(
+            url,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return const Center(child: Icon(Icons.broken_image));
+            },
           ),
         ),
       );
     }
 
-    if (path.endsWith(".jpg") ||
-        path.endsWith(".jpeg") ||
-        path.endsWith(".png") ||
-        path.endsWith(".gif")) {
-      return AspectRatio(
-        aspectRatio: 7 / 8,
-        child: Image.network(
-          url,
-          width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return const Center(child: Icon(Icons.broken_image));
-          },
-        ),
-      );
-    }
-
+    // ================= UNKNOWN =================
     return Container(
       padding: const EdgeInsets.all(12),
       color: Theme.of(widget.parentContext).colorScheme.surfaceVariant,
