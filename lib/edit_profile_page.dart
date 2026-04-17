@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:mootable/personal_info_page.dart';
 import '../core/auth_service.dart';
 import '../core/api_client.dart';
 import 'error/error_handler.dart';
@@ -134,6 +135,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 onPressed: _saving ? null : _saveProfile,
                 icon: const Icon(Icons.save),
                 label: Text(_saving ? l10n.saving_button : l10n.save_button),
+              ),
+              const SizedBox(height: 16),
+
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PersonalInfoPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.info_outline),
+                label: const Text("Kişisel Bilgiler"),
               ),
             ],
           ),
