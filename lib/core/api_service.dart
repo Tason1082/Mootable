@@ -13,6 +13,19 @@ class ApiService {
       return false;
     }
   }
+  static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
+    try {
+      final response = await ApiClient.dio.get(
+        "/api/users",
+        queryParameters: {"username": query},
+      );
+
+      return List<Map<String, dynamic>>.from(response.data);
+    } catch (e) {
+      print("ERROR searchUsers: $e");
+      return [];
+    }
+  }
 // ================= SAVED POSTS =================
 // ================= USERS =================
 

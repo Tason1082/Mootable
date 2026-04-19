@@ -53,12 +53,16 @@ class _ProfilePageState extends State<ProfilePage>
         };
       }).toList();
 
+      if (!mounted) return; // 🔥 KRİTİK
+
       setState(() {
         user = Map<String, dynamic>.from(userRes.data);
         posts = mappedPosts;
         loading = false;
       });
     } catch (e) {
+      if (!mounted) return; // 🔥 BURAYA DA
+
       setState(() => loading = false);
     }
   }

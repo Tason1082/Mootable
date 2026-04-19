@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:mootable/voice/send_invite.dart';
 import 'package:mootable/voice/voice_manager.dart';
 import 'package:mootable/voice/voice_service.dart';
 
@@ -226,16 +227,33 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                     logDebug("Invite error -> $e");
                   }
                 }
+                if (value == "sendInvite") {
+                  if (!mounted) return;
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const SendInvitePage(),
+                    ),
+                  );
+                }
               },
               itemBuilder: (context) => [
                 const PopupMenuItem(
                   value: "invite",
-                  child: Text("Davet oluştur"),
+                  child: Text("Davet kodu oluştur"),
                 ),
                 const PopupMenuItem(
                   value: "delete",
                   child: Text(
                     "Odayı Sil",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: "sendInvite",
+                  child: Text(
+                    "Davet gönder",
                     style: TextStyle(color: Colors.red),
                   ),
                 ),

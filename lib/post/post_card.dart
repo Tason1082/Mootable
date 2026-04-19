@@ -10,8 +10,7 @@ import 'full_screen_image.dart';
 import '../my_community/community_detail_page.dart';
 import '../profile_page.dart';
 import '../quote_post_page.dart';
-import '../video_player_widget.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
+
 
 import 'inline_video_player.dart';
 

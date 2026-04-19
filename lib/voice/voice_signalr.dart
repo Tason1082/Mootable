@@ -17,7 +17,7 @@ class VoiceSignalR {
   Future<void> connect({int retries = 3, Duration timeout = const Duration(seconds: 10)}) async {
     connection = HubConnectionBuilder()
         .withUrl(
-      "http://localhost:5004/voicehub",
+      "http://192.168.0.31:5004/voicehub",
       options: HttpConnectionOptions(
         accessTokenFactory: () async {
           final token = await AuthService.getToken();

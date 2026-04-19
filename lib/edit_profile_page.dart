@@ -43,31 +43,47 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _usernameController.dispose();
     _bioController.dispose();
     super.dispose();
+    _fetchUser();
   }
+  Future<void> _fetchUser() async {
+    try {
+      final res = await ApiClient.dio.get('/api/users/me');
 
+      final data = res.data;
+
+      if (!mounted) return;
+
+      setState(() {
+        _usernameController.text = data['username'] ?? '';
+        _bioController.text = data['bio'] ?? '';
+      });
+    } catch (e) {
+      // opsiyonel hata yönetimi
+    }
+  }
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-    if (userId == null) return;
 
     setState(() => _saving = true);
     final l10n = AppLocalizations.of(context)!;
 
     try {
-      final Map<String, dynamic> data = {};
-
       final username = _usernameController.text.trim();
       final bio = _bioController.text.trim();
+
+      final Map<String, dynamic> data = {};
 
       // sadece doluysa gönder
       if (username.isNotEmpty) {
         data['username'] = username;
       }
 
-      // bio boş olsa bile null yerine gönderilebilir (backend kararına bağlı)
-      data['bio'] = bio;
+      if (bio.isNotEmpty) {
+        data['bio'] = bio;
+      }
 
       await ApiClient.dio.put(
-        '/api/users/$userId',
+        '/api/users', // ✅ düzeltildi
         data: data,
       );
 
@@ -82,11 +98,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       ErrorHandler.showError(context, e, stackTrace: st);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.profile_saved_error)),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.profile_saved_error)),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
