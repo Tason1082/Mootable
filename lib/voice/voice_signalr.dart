@@ -5,7 +5,7 @@ import '../core/auth_service.dart';
 
 class VoiceSignalR {
   late HubConnection connection;
-
+  Function(Map<String, dynamic> invite)? onInvite;
   // Callbacks
   Function(String roomId, String offer, String userId)? onOffer;
   Function(String roomId, String answer, String userId)? onAnswer;
@@ -33,7 +33,22 @@ class VoiceSignalR {
       if (args == null || args.length < 3) return;
       onOffer?.call(args[0].toString(), args[1].toString(), args[2].toString());
     });
+    connection.on("ReceiveInvite", (args) {
+      try {
+        if (args == null || args.isEmpty) return;
 
+        final raw = args[0];
+
+        if (raw is Map) {
+          final invite = Map<String, dynamic>.from(raw);
+          onInvite?.call(invite);
+        } else {
+          print("Invite format hatalı: $raw");
+        }
+      } catch (e) {
+        print("ReceiveInvite parse error: $e");
+      }
+    });
     connection.on("ReceiveAnswer", (args) {
       if (args == null || args.length < 3) return;
       onAnswer?.call(args[0].toString(), args[1].toString(), args[2].toString());

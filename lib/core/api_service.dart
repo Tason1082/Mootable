@@ -26,6 +26,25 @@ class ApiService {
       return [];
     }
   }
+  static Future<bool> sendVoiceRoomInvites({
+    required int roomId,
+    required List<String> receiverIds,
+  }) async {
+    try {
+      await ApiClient.dio.post(
+        "/api/voice/send-invite",
+        data: {
+          "roomId": roomId,
+          "receiverIds": receiverIds,
+        },
+      );
+
+      return true;
+    } catch (e) {
+      print("ERROR sendVoiceRoomInvites: $e");
+      return false;
+    }
+  }
 // ================= SAVED POSTS =================
 // ================= USERS =================
 
@@ -116,6 +135,37 @@ class ApiService {
     } catch (e) {
       print("ERROR getMyCommunities: $e");
       return [];
+    }
+  }
+  // ================= VOICE INVITES =================
+
+  static Future<List<Map<String, dynamic>>> getMyInvites() async {
+    try {
+      final response = await ApiClient.dio.get("/api/voice/my-invites");
+      return List<Map<String, dynamic>>.from(response.data);
+    } catch (e) {
+      print("ERROR getMyInvites: $e");
+      return [];
+    }
+  }
+
+  static Future<bool> acceptInvite(int inviteId) async {
+    try {
+      await ApiClient.dio.post("/api/voice/accept-invite/$inviteId");
+      return true;
+    } catch (e) {
+      print("ERROR acceptInvite: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> rejectInvite(int inviteId) async {
+    try {
+      await ApiClient.dio.post("/api/voice/reject-invite/$inviteId");
+      return true;
+    } catch (e) {
+      print("ERROR rejectInvite: $e");
+      return false;
     }
   }
 }

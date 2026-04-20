@@ -233,7 +233,7 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const SendInvitePage(),
+                      builder: (context) =>SendInvitePage(roomId: widget.roomId),
                     ),
                   );
                 }

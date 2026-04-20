@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mootable/voice/voice_manager.dart';
 import 'package:mootable/voice/voice_room_page.dart';
 import 'package:mootable/voice/voice_service.dart';
+import 'package:mootable/voice/voice_signalr.dart';
+
+import '../core/api_service.dart';
 
 class ChatRoomPage extends StatelessWidget {
   const ChatRoomPage({super.key});
@@ -197,28 +202,134 @@ class _LinkGirViewState extends State<LinkGirView> {
   }
 }
 
-class DavetlerView extends StatelessWidget {
+class DavetlerView extends StatefulWidget {
   const DavetlerView({super.key});
 
   @override
+  State<DavetlerView> createState() => _DavetlerViewState();
+}
+
+class _DavetlerViewState extends State<DavetlerView> {
+  List<Map<String, dynamic>> invites = [];
+  bool isLoading = true;
+
+  late VoiceSignalR signalR;
+
+  @override
+  void initState() {
+    super.initState();
+    initAll();
+  }
+
+  Future<void> initAll() async {
+    signalR = VoiceSignalR();
+
+    // 🔴 REAL-TIME INVITE
+    signalR.onInvite = (invite) {
+      setState(() {
+        invites.insert(0, invite);
+      });
+    };
+
+    await signalR.connect();
+
+    await fetchInvites();
+  }
+
+  Future<void> fetchInvites() async {
+    final data = await ApiService.getMyInvites();
+
+    setState(() {
+      invites = data;
+      isLoading = false;
+    });
+  }
+
+  Future<void> handleAccept(Map<String, dynamic> invite) async {
+    final inviteId = invite["id"];
+    final roomId = invite["roomId"];
+
+    final success = await ApiService.acceptInvite(inviteId);
+
+    if (success) {
+      // listeden kaldır
+      setState(() {
+        invites.removeWhere((x) => x["id"] == inviteId);
+      });
+
+      // odaya katıl
+      await signalR.joinRoom(roomId.toString());
+
+      // voice ekranına git
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VoiceRoomPage(roomId: roomId),
+        ),
+      );
+    }
+  }
+
+  Future<void> handleReject(Map<String, dynamic> invite) async {
+    final inviteId = invite["id"];
+
+    final success = await ApiService.rejectInvite(inviteId);
+
+    if (success) {
+      setState(() {
+        invites.removeWhere((x) => x["id"] == inviteId);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    signalR.disconnect();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ListView(
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (invites.isEmpty) {
+      return const Center(child: Text("Hiç davetin yok"));
+    }
+
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      children: const [
-        ListTile(
-          leading: Icon(Icons.person),
-          title: Text("Ahmet seni davet etti"),
-        ),
-        ListTile(
-          leading: Icon(Icons.person),
-          title: Text("Ayşe seni davet etti"),
-        ),
-      ],
+      itemCount: invites.length,
+      itemBuilder: (context, index) {
+        final invite = invites[index];
+
+        final senderName = invite["senderUsername"] ?? "Biri";
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: const Icon(Icons.person),
+            title: Text("$senderName seni odaya davet etti"),
+            subtitle: Row(
+              children: [
+                ElevatedButton(
+                  onPressed: () => handleAccept(invite),
+                  child: const Text("Kabul Et"),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: () => handleReject(invite),
+                  child: const Text("Reddet"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
-
-
 
 
 class SohbetBaslatView extends StatefulWidget {

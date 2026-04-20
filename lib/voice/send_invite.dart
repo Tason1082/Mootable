@@ -3,7 +3,9 @@ import '../core/api_service.dart';
 import '../profile_page.dart';
 
 class SendInvitePage extends StatefulWidget {
-  const SendInvitePage({super.key});
+  final int roomId;
+
+  const SendInvitePage({super.key, required this.roomId});
 
   @override
   State<SendInvitePage> createState() => _SendInvitePageState();
@@ -12,7 +14,7 @@ class SendInvitePage extends StatefulWidget {
 class _SendInvitePageState extends State<SendInvitePage> {
   List users = [];
   List selectedUsers = [];
-
+  bool sending = false;
   final TextEditingController controller = TextEditingController();
 
   Future<void> search(String value) async {
@@ -238,12 +240,43 @@ class _SendInvitePageState extends State<SendInvitePage> {
 
       /// 🚀 SEND BUTTON
       floatingActionButton: FloatingActionButton(
-        onPressed: selectedUsers.isEmpty
+        onPressed: (selectedUsers.isEmpty || sending)
             ? null
-            : () {
-          print(selectedUsers);
+            : () async {
+          setState(() => sending = true);
+
+          final receiverIds = selectedUsers
+              .map<String>((u) => u["id"].toString())
+              .toList();
+
+          final success = await ApiService.sendVoiceRoomInvites(
+            roomId: widget.roomId,
+            receiverIds: receiverIds,
+          );
+
+          if (!mounted) return;
+
+          setState(() => sending = false);
+
+          if (success) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Davetler gönderildi")),
+            );
+
+            Navigator.pop(context);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Hata oluştu")),
+            );
+          }
         },
-        child: const Icon(Icons.send),
+        child: sending
+            ? const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        )
+            : const Icon(Icons.send),
       ),
     );
   }
