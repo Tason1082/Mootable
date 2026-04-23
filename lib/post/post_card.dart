@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
-import '../core/api_client.dart';
+
 import '../core/api_service.dart';
 import 'full_screen_image.dart';
 import '../my_community/community_detail_page.dart';
@@ -220,7 +220,7 @@ class _PostCardState extends State<PostCard> {
     final colors = theme.colorScheme;
     final post = widget.post;
     final postId = post["id"];
-
+    final profileImage = post["profileImageUrl"];
     return Container(
       color: Colors.white,
       child: Column(
@@ -228,9 +228,20 @@ class _PostCardState extends State<PostCard> {
         children: [
           ListTile(
             leading: CircleAvatar(
-              backgroundColor: colors.surfaceVariant,
-              child: Icon(Icons.groups, color: colors.onSurfaceVariant),
-            ),
+      radius: 20,
+        backgroundColor: colors.surfaceVariant,
+        child: ClipOval(
+          child: profileImage != null && profileImage.isNotEmpty
+              ? Image.network(
+            profileImage,
+            width: 40,
+            height: 40,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Icon(Icons.person),
+          )
+              : Icon(Icons.person, color: colors.onSurfaceVariant),
+        ),
+      ),
             title: Row(
               children: [
                 GestureDetector(

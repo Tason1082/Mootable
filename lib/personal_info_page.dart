@@ -1,6 +1,10 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../core/api_client.dart';
-import '../core/auth_service.dart';
 import 'error/error_handler.dart';
 
 class PersonalInfoPage extends StatefulWidget {
@@ -11,18 +15,17 @@ class PersonalInfoPage extends StatefulWidget {
 }
 
 class _PersonalInfoPageState extends State<PersonalInfoPage> {
-  final _formKey = GlobalKey<FormState>();
+  File? selectedImage;
+  String? currentImageUrl;
 
   final emailCtrl = TextEditingController();
   final fullNameCtrl = TextEditingController();
-  final imageCtrl = TextEditingController();
 
   String? gender;
   DateTime? birthDate;
 
   bool loading = true;
   bool saving = false;
-  String? userId;
 
   @override
   void initState() {
@@ -33,12 +36,12 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
   Future<void> _init() async {
     try {
       final res = await ApiClient.dio.get('/api/users/me');
-
       final u = res.data;
 
       emailCtrl.text = u['email'] ?? "";
       fullNameCtrl.text = u['fullName'] ?? "";
-      imageCtrl.text = u['profileImageUrl'] ?? "";
+
+      currentImageUrl = u['profileImageUrl'];
 
       gender = u['gender'];
 
@@ -53,32 +56,73 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
     setState(() => loading = false);
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedImage = File(picked.path);
+      });
+    }
+  }
+
+  Future<void> _uploadImage() async {
+    if (selectedImage == null) return;
+
+    final formData = FormData.fromMap({
+      "file": await MultipartFile.fromFile(selectedImage!.path),
+    });
+
+    final res = await ApiClient.dio.post(
+      '/api/users/upload-profile-photo',
+      data: formData,
+    );
+
+    setState(() {
+      currentImageUrl = res.data; // fileName geliyor
+      selectedImage = null;
+    });
+  }
+
   Future<void> _save() async {
     setState(() => saving = true);
 
-    final data = <String, dynamic>{};
+    try {
+      if (selectedImage != null) {
+        await _uploadImage();
+      }
 
-    if (emailCtrl.text.trim().isNotEmpty)
-      data["email"] = emailCtrl.text.trim();
+      final data = <String, dynamic>{};
 
-    if (fullNameCtrl.text.trim().isNotEmpty)
-      data["fullName"] = fullNameCtrl.text.trim();
+      if (emailCtrl.text.trim().isNotEmpty) {
+        data["email"] = emailCtrl.text.trim();
+      }
 
-    if (imageCtrl.text.trim().isNotEmpty)
-      data["profileImageUrl"] = imageCtrl.text.trim();
+      if (fullNameCtrl.text.trim().isNotEmpty) {
+        data["fullName"] = fullNameCtrl.text.trim();
+      }
 
-    if (gender != null)
-      data["gender"] = gender;
-
+      if (gender != null) {
+        data["gender"] = gender;
+      }
 
       data["birthDate"] = birthDate != null
           ? birthDate!.toUtc().toIso8601String()
           : null;
 
-    await ApiClient.dio.put('/api/users', data: data);
+      await ApiClient.dio.put('/api/users', data: data);
+    } catch (e, st) {
+      ErrorHandler.showError(context, e, stackTrace: st);
+    }
 
-    if (mounted) setState(() => saving = false);
+    setState(() => saving = false);
   }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -90,6 +134,13 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
     if (picked != null) {
       setState(() => birthDate = picked);
     }
+  }
+
+  /// 🔥 SAFE IMAGE URL (PRIVATE BUCKET FIX)
+  String? getImageUrl() {
+    if (currentImageUrl == null) return null;
+
+    return currentImageUrl;
   }
 
   @override
@@ -115,9 +166,33 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
         child: ListView(
           children: [
 
+            /// 👤 PROFILE IMAGE (FIXED)
+            Center(
+              child: GestureDetector(
+                onTap: _pickImage,
+                child: CircleAvatar(
+                  radius: 50,
+
+                  backgroundImage: selectedImage != null
+                      ? FileImage(selectedImage!)
+                      : (currentImageUrl != null
+                      ? NetworkImage(
+                    // 🔥 backend signed URL dönmeli!
+                    currentImageUrl!,
+                  )
+                      : null) as ImageProvider?,
+
+                  child: (selectedImage == null && currentImageUrl == null)
+                      ? const Icon(Icons.camera_alt, size: 30)
+                      : null,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
             _input("E-posta", emailCtrl),
             _input("Ad Soyad", fullNameCtrl),
-            _input("Profil Foto URL", imageCtrl),
 
             const SizedBox(height: 16),
 
