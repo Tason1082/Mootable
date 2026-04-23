@@ -6,9 +6,17 @@ import '../core/api_service.dart';
 class VoiceService {
 
   /// 🎤 Oda oluştur
-  static Future<int> createRoom() async {
-    final response =
-    await ApiClient.dio.post("/api/voice/create-room");
+  static Future<int> createRoom({
+    required String name,
+    required int maxMembers,
+  }) async {
+    final response = await ApiClient.dio.post(
+      "/api/voice/create-room",
+      data: {
+        "name": name,
+        "maxMembers": maxMembers,
+      },
+    );
 
     return response.data;
   }

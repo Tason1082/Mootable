@@ -17,17 +17,18 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   late VideoPlayerController _controller;
   bool _isInitialized = false;
   bool _isMuted = true;
-
+  bool _manuallyPaused = false;
   @override
   void initState() {
     super.initState();
 
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.url))
       ..setLooping(true)
-      ..setVolume(0) // 🔇 başlangıç sessiz
+      ..setVolume(0)
       ..initialize().then((_) {
         if (mounted) {
           setState(() => _isInitialized = true);
+          _controller.play(); // 🔥 önemli
         }
       });
   }
@@ -36,9 +37,13 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
     if (!_controller.value.isInitialized) return;
 
     setState(() {
-      _controller.value.isPlaying
-          ? _controller.pause()
-          : _controller.play();
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+        _manuallyPaused = true; // 👈 kullanıcı durdurdu
+      } else {
+        _controller.play();
+        _manuallyPaused = false; // 👈 kullanıcı tekrar başlattı
+      }
     });
   }
 
@@ -52,6 +57,8 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   void _onVisibilityChanged(double visibleFraction) {
     if (!_isInitialized) return;
 
+    if (_manuallyPaused) return; // 🔥 KRİTİK: kullanıcı durdurduysa asla oynatma
+
     if (visibleFraction > 0.6) {
       _controller.play();
     } else {
@@ -60,6 +67,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
   }
 
   String _formatDuration(Duration d) {
+    if (d.inSeconds <= 0) return "00:00";
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return "$minutes:$seconds";
@@ -86,9 +94,16 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
           child: _isInitialized
               ? Stack(
             children: [
-              VideoPlayer(_controller),
-              // 🔲 FULLSCREEN TAP (arkada)
-              Positioned.fill(
+              /// 🎬 VIDEO (play/pause burada)
+              GestureDetector(
+                onTap: _togglePlayPause,
+                child: VideoPlayer(_controller),
+              ),
+
+              /// ⛶ FULLSCREEN BUTTON (artık buradan açılıyor)
+              Positioned(
+                bottom: 50,
+                right: 10,
                 child: GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -100,9 +115,22 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                       ),
                     );
                   },
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.fullscreen,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
                 ),
               ),
-              // ▶️ Play icon (pause durumunda)
+
+              /// ▶️ PLAY ICON
               if (!_controller.value.isPlaying)
                 const Center(
                   child: Icon(
@@ -112,7 +140,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                   ),
                 ),
 
-              // 🔊 Mute button (sağ üst)
+              /// 🔊 MUTE (artık düzgün çalışır)
               Positioned(
                 top: 10,
                 right: 10,
@@ -125,9 +153,7 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Icon(
-                      _isMuted
-                          ? Icons.volume_off
-                          : Icons.volume_up,
+                      _isMuted ? Icons.volume_off : Icons.volume_up,
                       color: Colors.white,
                       size: 20,
                     ),
@@ -135,31 +161,49 @@ class _InlineVideoPlayerState extends State<InlineVideoPlayer> {
                 ),
               ),
 
-              // ⏱ Süre (sol alt)
+              /// ⏱ SÜRE
               Positioned(
-                bottom: 8,
+                bottom: 20,
                 left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  color: Colors.black54,
-                  child: Text(
-                    _formatDuration(
-                        _controller.value.duration),
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 12),
-                  ),
+                right: 8,
+                child: ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: _controller,
+                  builder: (context, value, child) {
+                    if (!value.isInitialized ||
+                        value.duration.inSeconds == 0) {
+                      return const SizedBox();
+                    }
+
+                    final duration = value.duration;
+                    final position = value.position;
+                    final safePosition =
+                    position > duration ? duration : position;
+
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(safePosition),
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
 
-              // 🎚 Progress bar + seek
+              /// 🎚 PROGRESS
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
                 child: VideoProgressIndicator(
                   _controller,
-                  allowScrubbing: true, // 👈 ileri geri sarma
+                  allowScrubbing: true,
                   colors: VideoProgressColors(
                     playedColor: Colors.red,
                     bufferedColor: Colors.grey,

@@ -10,7 +10,8 @@ class VoiceSignalR {
   Function(String roomId, String offer, String userId)? onOffer;
   Function(String roomId, String answer, String userId)? onAnswer;
   Function(String roomId, String candidate, String userId, String sdpMid, int sdpIndex)? onIce;
-  Function(String connectionId)? onUserJoined;
+  Function(String userId)? onUserJoined;
+  Function(String connectionId)? onPeerJoined;
   Function(String userId)? onUserLeft;
   Function(dynamic roomId)? onRoomDeleted;
   /// Bağlantıyı başlat (retry + timeout destekli)
@@ -63,6 +64,11 @@ class VoiceSignalR {
         args[3].toString(),
         args[4] as int,
       );
+    });
+
+    connection.on("PeerJoined", (args) {
+      if (args == null || args.isEmpty) return;
+      onPeerJoined?.call(args[0].toString());
     });
 
     connection.on("UserJoined", (args) {

@@ -48,7 +48,6 @@ class VoiceManager {
     _connectToExistingUsers();
   }
 
-  // ================= EVENTS =================
   void _setupEvents() {
     webrtc.onAnswerCreated = (userId, sdp) {
       signalR.sendAnswer(roomId.toString(), sdp);
@@ -64,69 +63,79 @@ class VoiceManager {
       }
     };
 
-    signalR.onOffer = (r, offer, userId) async {
-      userId = normalize(userId);
-      if (userId == myUserId) return;
+    // ================= OFFER =================
+    signalR.onOffer = (r, offer, connId) async {
+      final id = connId.toString();
 
-      if (!webrtc.hasPeer(userId)) {
-        await webrtc.createPeer(userId, polite: true);
+      if (!webrtc.hasPeer(id)) {
+        await webrtc.createPeer(id, polite: true);
       }
 
-      await webrtc.handleOffer(userId, offer);
+      await webrtc.handleOffer(id, offer);
     };
 
-    signalR.onAnswer = (r, answer, userId) async {
-      userId = normalize(userId);
-      if (userId == myUserId) return;
+    // ================= ANSWER =================
+    signalR.onAnswer = (r, answer, connId) async {
+      final id = connId.toString();
 
-      await webrtc.handleAnswer(userId, answer);
-    };
-
-    signalR.onIce = (r, c, userId, mid, index) async {
-      userId = normalize(userId);
-      if (userId == myUserId) return;
-
-      if (!webrtc.hasPeer(userId)) {
-        await webrtc.createPeer(userId, polite: false);
+      if (!webrtc.hasPeer(id)) {
+        await webrtc.createPeer(id, polite: false);
       }
 
-      await webrtc.addIce(userId, c, mid, index);
+      await webrtc.handleAnswer(id, answer);
     };
 
-    signalR.onUserJoined = (id) async {
-      final user = normalize(id.toString());
+    // ================= ICE =================
+    signalR.onIce = (r, c, connId, mid, index) async {
+      final id = connId.toString();
 
-      if (!members.value.contains(user)) {
-        members.value = [...members.value, user];
+      if (!webrtc.hasPeer(id)) {
+        await webrtc.createPeer(id, polite: false);
       }
 
-      if (!webrtc.hasPeer(user)) {
-        await webrtc.createPeer(user, polite: false);
+      await webrtc.addIce(id, c, mid, index);
+    };
 
-        if (_shouldSendOffer(user)) {
-          final offer = await webrtc.createOffer(user);
+    // ================= PEER JOINED =================
+    signalR.onPeerJoined = (id) async {
+      final connId = id.toString();
+
+      if (!webrtc.hasPeer(connId)) {
+        await webrtc.createPeer(connId, polite: false);
+
+        if (_shouldSendOffer(connId)) {
+          final offer = await webrtc.createOffer(connId);
           signalR.sendOffer(roomId.toString(), offer);
         }
       }
     };
 
+    // ================= USER JOINED (UI ONLY) =================
+    signalR.onUserJoined = (id) {
+      final userId = id.toString();
+
+      if (!members.value.contains(userId)) {
+        members.value = [...members.value, userId];
+      }
+    };
+
+    // ================= USER LEFT =================
     signalR.onUserLeft = (id) {
-      final user = normalize(id);
+      final connId = id.toString();
 
       members.value =
-          members.value.where((m) => m != user).toList();
+          members.value.where((m) => m != connId).toList();
 
-      webrtc.removePeer(user);
+      webrtc.removePeer(connId);
     };
+
+    // ================= ROOM DELETED =================
     signalR.onRoomDeleted = (roomId) async {
       final id = int.tryParse(roomId.toString());
-
       if (id != this.roomId) return;
 
-      // 🔥 tüm bağlantıları kapat
       await leave();
     };
-
   }
 
   // ================= LOGIC =================

@@ -247,7 +247,7 @@ class _DavetlerViewState extends State<DavetlerView> {
 
   Future<void> handleAccept(Map<String, dynamic> invite) async {
     final inviteId = invite["id"];
-    final roomId = invite["roomId"];
+    final roomId = invite["roomId"] ?? invite["RoomId"] ?? invite["voiceRoomId"];
 
     final success = await ApiService.acceptInvite(inviteId);
 
@@ -331,7 +331,6 @@ class _DavetlerViewState extends State<DavetlerView> {
   }
 }
 
-
 class SohbetBaslatView extends StatefulWidget {
   const SohbetBaslatView({super.key});
 
@@ -363,11 +362,14 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
     }
   }
 
-  Future<void> _createRoom() async {
+  Future<void> _createRoom(String name, int maxMembers) async {
     setState(() => _creating = true);
 
     try {
-      final roomId = await VoiceService.createRoom();
+      final roomId = await VoiceService.createRoom(
+        name: name,
+        maxMembers: maxMembers,
+      );
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Oda oluşturuldu! ID: $roomId")),
@@ -383,6 +385,62 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
     setState(() => _creating = false);
   }
 
+  Future<void> _showCreateRoomDialog() async {
+    final nameController = TextEditingController();
+    final countController = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Oda Oluştur"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: "Oda adı",
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: countController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Kişi sayısı",
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("İptal"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final count = int.tryParse(countController.text) ?? 0;
+
+                if (name.isEmpty || count <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Bilgileri doğru gir")),
+                  );
+                  return;
+                }
+
+                Navigator.pop(context);
+                _createRoom(name, count);
+              },
+              child: const Text("Oluştur"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -393,7 +451,9 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _creating ? null : _createRoom,
+              onPressed: _creating
+                  ? null
+                  : _showCreateRoomDialog, // ✅ BURASI DÜZELTİLDİ
               icon: _creating
                   ? const SizedBox(
                 width: 18,
@@ -433,16 +493,15 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
 
                 return InkWell(
                   onTap: () {
-
                     final roomId = room["id"];
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => VoiceRoomPage(roomId: roomId),
+                        builder: (_) =>
+                            VoiceRoomPage(roomId: roomId),
                       ),
                     );
-
                   },
                   child: Container(
                     decoration: BoxDecoration(
@@ -459,10 +518,19 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          "Oda ${room["id"]}",
+                          room["name"] ??
+                              "Oda ${room["id"]}", // ✅ isim göster
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "Kapasite: ${room["maxMembers"] ?? "-"}",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
                           ),
                         ),
                       ],
