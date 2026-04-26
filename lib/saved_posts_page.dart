@@ -100,18 +100,18 @@ class SavedPostsPageState extends State<SavedPostsPage> {
 
   bool _isVideo(String url) {
     final lower = url.toLowerCase();
-    return lower.endsWith('.mp4') ||
-        lower.endsWith('.mov') ||
-        lower.endsWith('.avi') ||
-        lower.endsWith('.mkv') ||
-        lower.endsWith('.webm');
+
+    return lower.contains('.mp4') ||
+        lower.contains('.mov') ||
+        lower.contains('.avi') ||
+        lower.contains('.mkv') ||
+        lower.contains('.webm');
   }
   Widget _buildThumbnail(
       String? mediaUrl,
       String? content,
       String? username,
       String? avatarUrl,
-    
       ) {
     final hasText = content != null && content.trim().isNotEmpty;
 
@@ -120,108 +120,111 @@ class SavedPostsPageState extends State<SavedPostsPage> {
     // 📝 TEXT ONLY
     if (mediaUrl == null || mediaUrl.isEmpty) {
       mediaWidget = Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          border: Border.all(color: Colors.grey.shade300),
-        ),
+        color: Colors.grey[200],
         padding: const EdgeInsets.all(8),
         child: Text(
           hasText ? content! : "No content",
-          maxLines: 6,
+          maxLines: 4,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 12,
-            height: 1.3,
-            fontWeight: FontWeight.w500,
-            color: Colors.black87,
-          ),
         ),
       );
     }
 
     // 🎥 VIDEO
     else if (_isVideo(mediaUrl)) {
-      mediaWidget = Stack(
-        fit: StackFit.expand,
-        children: [
-          _VideoThumbnail(videoUrl: mediaUrl),
+      mediaWidget = AspectRatio(
+        aspectRatio: 1,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            _VideoThumbnail(videoUrl: mediaUrl),
 
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.center,
-                colors: [Colors.black54, Colors.transparent],
-              ),
-            ),
-          ),
-
-          const Center(
-            child: Icon(Icons.play_circle_fill,
-                color: Colors.white70, size: 36),
-          ),
-
-          if (hasText)
-            Positioned(
-              bottom: 6,
-              left: 6,
-              right: 6,
-              child: Text(
-                content!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.center,
+                  colors: [Colors.black54, Colors.transparent],
                 ),
               ),
             ),
-        ],
+
+            const Center(
+              child: Icon(Icons.play_circle_fill,
+                  color: Colors.white70, size: 36),
+            ),
+
+            if (hasText)
+              Positioned(
+                bottom: 6,
+                left: 6,
+                right: 6,
+                child: Text(
+                  content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+          ],
+        ),
       );
     }
 
     // 🖼️ IMAGE
     else {
-      mediaWidget = Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.network(
-            mediaUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) =>
-            const Icon(Icons.broken_image),
-          ),
-
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.center,
-                colors: [Colors.black54, Colors.transparent],
-              ),
+      mediaWidget = AspectRatio(
+        aspectRatio: 1,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image.network(
+              mediaUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) {
+                return Container(
+                  color: Colors.black12,
+                  child: const Center(
+                    child: Icon(Icons.broken_image),
+                  ),
+                );
+              },
             ),
-          ),
 
-          if (hasText)
-            Positioned(
-              bottom: 6,
-              left: 6,
-              right: 6,
-              child: Text(
-                content!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.center,
+                  colors: [Colors.black54, Colors.transparent],
                 ),
               ),
             ),
-        ],
+
+            if (hasText)
+              Positioned(
+                bottom: 6,
+                left: 6,
+                right: 6,
+                child: Text(
+                  content!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+          ],
+        ),
       );
     }
+
+
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,7 +316,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
             final mediaUrl = post["imageUrl"];
             final content = post["content"]; // backend'e göre değişebilir
             final username = post["username"];
-            final avatarUrl = post["avatarUrl"];
+            final avatarUrl = post["profileImageUrl"];
             return GestureDetector(
               onTap: () {
                 Navigator.push(

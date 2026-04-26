@@ -349,7 +349,7 @@ class _PostCardState extends State<PostCard> {
                     );
                   },
                 ),
-                Text("${post["comment_count"] ?? 0}"),
+                Text("${post["commentCount"] ?? 0}"),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.repeat),

@@ -3,6 +3,7 @@ import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../TimeAgo.dart';
@@ -54,6 +55,68 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       filteredPosts = results;
     });
   }
+  void _openCommunityImage(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black,
+      isScrollControlled: true,
+      builder: (_) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height,
+            child: Column(
+              children: [
+                // 🔥 TOP BAR (geri + boşluk)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      const Spacer(),
+                    ],
+                  ),
+                ),
+
+                // 🔥 IMAGE
+                Expanded(
+                  child: Center(
+                    child: community?['image'] != null
+                        ? Image.network(
+                      community!['image'],
+                      fit: BoxFit.contain,
+                    )
+                        : const Icon(
+                      Icons.groups,
+                      color: Colors.white,
+                      size: 100,
+                    ),
+                  ),
+                ),
+
+                // 🔥 ALT BUTON (artık yukarıda ve safe)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _pickAndUploadImage();
+                        Navigator.pop(context);
+                      },
+                      child: const Text("Topluluk resmini değiştir"),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
   void _shareCommunity() {
     final url = "https://mootable.com/r/${widget.communityName}";
 
@@ -80,6 +143,38 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       }
     } catch (e) {
       if (mounted) setState(() => _loadingJoin = false);
+    }
+  }
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery);
+
+      if (picked == null) return;
+
+      final communityId = posts.isNotEmpty
+          ? posts[0]["communityId"].toString()
+          : null;
+
+      if (communityId == null) return;
+
+      final formData = FormData.fromMap({
+        "file": await MultipartFile.fromFile(picked.path),
+        "type": "icon", // 🔥 önemli
+      });
+
+      await ApiClient.dio.post(
+        "/api/communities/$communityId/upload-image",
+        data: formData,
+      );
+
+      // 🔥 tekrar çek (signed url yenilensin)
+      await fetchCommunity();
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Upload başarısız: $e")),
+      );
     }
   }
   Future<void> _toggleJoin() async {
@@ -109,14 +204,39 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     }
   }
   Future<void> fetchCommunity() async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+
     try {
+      // 🔥 ARTIK DOĞRU ENDPOINT
       final response = await ApiClient.dio.get(
+        '/api/communities/${widget.communityName}',
+      );
+
+      final data = response.data;
+
+      setState(() {
+        community = {
+          'id': data['id'],
+          'name': data['name'],
+          'description': data['description'] ?? '',
+          'image': data['iconUrl'], // 🔥 ARTIK DOĞRU KAYNAK
+          'banner': data['bannerUrl'],
+          'memberCount': data['memberCount'],
+          'isMember': data['isMember'],
+        };
+
+        isLoading = false;
+      });
+
+      // 🔥 posts hala ayrı endpointten gelebilir (istersen bırak)
+      final postsResponse = await ApiClient.dio.get(
         '/api/posts/community/byname/${widget.communityName}',
       );
 
-      // 🔥 MAPPING EKLENDİ
-      final raw = List<Map<String, dynamic>>.from(response.data);
+      final raw = List<Map<String, dynamic>>.from(postsResponse.data);
 
       final mappedPosts = raw.map((p) {
         return {
@@ -127,27 +247,23 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           "community": p["community"],
           "communityId": p["communityId"],
           "comment_count": p["commentCount"] ?? 0,
+          "profileImageUrl": p["profileImageUrl"],
         };
       }).toList();
 
       setState(() {
         posts = mappedPosts;
-        filteredPosts = mappedPosts; // 🔥 BURAYA EKLİYORSUN
-
-        community = {
-          'name': widget.communityName,
-          'description': 'Community description',
-          'posts': mappedPosts,
-        };
-
-        isLoading = false;
+        filteredPosts = mappedPosts;
       });
+
     } catch (e) {
       setState(() {
         error = e.toString();
         isLoading = false;
       });
-    }_checkIfJoined();
+    }
+
+    _checkIfJoined();
   }
 
   @override
@@ -181,17 +297,23 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         )
             : Row(
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.blue,
-              backgroundImage: community?['image'] != null
-                  ? NetworkImage(community!['image'])
-                  : null,
-              child: community?['image'] == null
-                  ? const Icon(Icons.groups, color: Colors.white, size: 18)
-                  : null,
+            /// 🔥 TIKLANABİLİR AVATAR
+            GestureDetector(
+              onTap: () => _openCommunityImage(context),
+              child: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.blue,
+                backgroundImage: community?['image'] != null
+                    ? NetworkImage(community!['image'])
+                    : null,
+                child: community?['image'] == null
+                    ? const Icon(Icons.groups, color: Colors.white, size: 18)
+                    : null,
+              ),
             ),
+
             const SizedBox(width: 8),
+
             Text(
               "r/${community?['name'] ?? ''}",
               style: const TextStyle(fontSize: 16),
@@ -233,7 +355,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "r/${community?['name'] ?? ''}",
+                  "ship/${community?['name'] ?? ''}",
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -254,12 +376,15 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                     _loadingJoin
                         ? const SizedBox(
                       width: 80,
-                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: Center(
+                          child:
+                          CircularProgressIndicator(strokeWidth: 2)),
                     )
                         : ElevatedButton(
                       onPressed: _toggleJoin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isJoined ? Colors.grey[300] : null,
+                        backgroundColor:
+                        _isJoined ? Colors.grey[300] : null,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                         ),
@@ -277,20 +402,16 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           // POSTS
           Expanded(
             child: ListView.builder(
-              itemCount: filteredPosts.length, // 🔥 BURASI
+              itemCount: filteredPosts.length,
               itemBuilder: (context, index) {
-                final post = filteredPosts[index]; // 🔥 BURASI
+                final post = filteredPosts[index];
 
                 return PostCard(
                   post: post,
                   parentContext: context,
-
-                  // 🔥 ARTIK GLOBAL FONKSİYON
                   onVote: (postId, vote) {
                     toggleVote(this, postId, vote);
                   },
-
-                  // 🔥 INDEX FIX + GLOBAL JOIN
                   onJoinCommunity: (communityName, _) {
                     joinCommunity(this, communityName, index);
                   },
@@ -301,5 +422,4 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         ],
       ),
     );
-  }
-}
+  }}
