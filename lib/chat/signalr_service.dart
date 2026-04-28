@@ -14,7 +14,7 @@ class SignalRService {
     _connection = HubConnectionBuilder()
 
         .withUrl(
-      "http://10.0.2.2:5004/hubs/chat",
+      "http://192.168.0.31:5004/hubs/chat",
       options: HttpConnectionOptions(
         accessTokenFactory: () async => token,
       ),

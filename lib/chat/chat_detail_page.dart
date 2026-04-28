@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/api_service.dart';
 import 'conversation_service.dart';
 import 'message_model.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -72,10 +73,21 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Future<void> _loadInitialMessages() async {
     final convo = await ConversationService.get(widget.conversationId);
 
+    final msgs = convo.messages;
+
+    await Future.wait(
+      msgs.map((msg) async {
+        final user = await ApiService.getUserById(msg.senderId);
+
+        msg.senderUsername = user?["username"] ?? "Unknown";
+        msg.senderProfileImage = user?["profileImageUrl"];
+      }),
+    );
+
     if (!mounted) return;
 
     setState(() {
-      messages = convo.messages;
+      messages = msgs;
     });
 
     _scrollToBottom();
@@ -139,49 +151,72 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 final isMe = msg.senderId == myUserId;
 
                 return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    constraints: BoxConstraints(
-                      maxWidth:
-                      MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? const Color(0xFFDCF8C6)
-                          : Colors.grey.shade200,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(18),
-                        topRight: const Radius.circular(18),
-                        bottomLeft:
-                        Radius.circular(isMe ? 18 : 4),
-                        bottomRight:
-                        Radius.circular(isMe ? 4 : 18),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment:
-                      CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          msg.content,
-                          style:
-                          const TextStyle(fontSize: 15),
+                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment:
+                    isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                    children: [
+                      if (!isMe) ...[
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundImage: msg.senderProfileImage != null
+                              ? NetworkImage(msg.senderProfileImage!)
+                              : null,
+                          backgroundColor: Colors.grey.shade300,
+                          child: msg.senderProfileImage == null
+                              ? const Icon(Icons.person, size: 18)
+                              : null,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          formatTime(msg.createdAt),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.black54,
-                          ),
-                        ),
+                        const SizedBox(width: 8),
                       ],
-                    ),
+
+                      Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isMe ? const Color(0xFFDCF8C6) : Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!isMe)
+                              Text(
+                                msg.senderUsername ?? "Unknown",
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                              ),
+
+                            const SizedBox(height: 2),
+
+                            Text(
+                              msg.content,
+                              style: const TextStyle(fontSize: 15),
+                            ),
+
+                            const SizedBox(height: 4),
+
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Text(
+                                formatTime(msg.createdAt),
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },

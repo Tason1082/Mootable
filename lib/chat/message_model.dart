@@ -6,6 +6,9 @@ class MessageModel {
   final String? mediaUrl;
   final DateTime createdAt;
 
+  // 🔥 UI enrichment alanları
+  String? senderUsername;
+  String? senderProfileImage;
 
   MessageModel({
     required this.id,
@@ -14,6 +17,8 @@ class MessageModel {
     required this.content,
     this.mediaUrl,
     required this.createdAt,
+    this.senderUsername,
+    this.senderProfileImage,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {

@@ -1,3 +1,4 @@
+import '../newchatpage.dart';
 import 'api_client.dart';
 
 class ApiService {
@@ -13,6 +14,28 @@ class ApiService {
       return false;
     }
   }
+  static Future<List<UserDto>> getUsers() async {
+    try {
+      final response = await ApiClient.dio.get("/api/users");
+
+      final data = response.data as List;
+
+      return data.map((e) => UserDto.fromJson(e)).toList();
+    } catch (e) {
+      print("ERROR getUsers: $e");
+      return [];
+    }
+  }
+  static Future<String?> getUsernameById(String userId) async {
+    try {
+      final response = await ApiClient.dio.get("/api/users/$userId");
+
+      return response.data?["username"];
+    } catch (e) {
+      print("ERROR getUsernameById: $e");
+      return null;
+    }
+  }
   static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     try {
       final response = await ApiClient.dio.get(
@@ -26,6 +49,7 @@ class ApiService {
       return [];
     }
   }
+
   static Future<bool> sendVoiceRoomInvites({
     required int roomId,
     required List<String> receiverIds,

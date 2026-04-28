@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'chat/chat_detail_page.dart';
 import 'chat/conversation_list_model.dart';
 import 'chat/conversation_service.dart';
+import 'core/api_service.dart';
 import 'newchatpage.dart';
 
 class ChatPage extends StatefulWidget {
@@ -25,6 +26,15 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _load() async {
     try {
       final list = await ConversationService.getAll();
+
+      await Future.wait(
+        list.map((convo) async {
+          final user = await ApiService.getUserById(convo.name);
+
+          convo.username = user?["username"] ?? "Unknown";
+          convo.profileImageUrl = user?["profileImageUrl"];
+        }),
+      );
 
       setState(() {
         conversations = list;
@@ -55,12 +65,17 @@ class _ChatPageState extends State<ChatPage> {
           final convo = conversations[index];
 
           return ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: Color(0xFFE0E0E0),
-              child: Icon(Icons.chat_bubble_outline, color: Colors.black),
+            leading: CircleAvatar(
+              backgroundImage: convo.profileImageUrl != null
+                  ? NetworkImage(convo.profileImageUrl!)
+                  : null,
+              backgroundColor: const Color(0xFFE0E0E0),
+              child: convo.profileImageUrl == null
+                  ? const Icon(Icons.person, color: Colors.black)
+                  : null,
             ),
             title: Text(
-              convo.name,
+              convo.username ?? "Unknown",
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(

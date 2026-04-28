@@ -1,6 +1,9 @@
 class ConversationListModel {
   final int id;
-  final String name;
+  final String name; // userId
+  String? username;
+  String? profileImageUrl; // 🔥 EKLENDİ
+
   final bool isGroup;
   final String lastMessage;
   final DateTime? lastMessageAt;
@@ -8,6 +11,8 @@ class ConversationListModel {
   ConversationListModel({
     required this.id,
     required this.name,
+    this.username,
+    this.profileImageUrl,
     required this.isGroup,
     required this.lastMessage,
     required this.lastMessageAt,

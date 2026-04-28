@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import 'chat/chat_detail_page.dart';
 import 'chat/conversation_service.dart';
+import 'core/api_service.dart';
 
 class NewChatPage extends StatefulWidget {
   const NewChatPage({super.key});
@@ -32,21 +33,12 @@ class _NewChatPageState extends State<NewChatPage> {
   // API → USERS
   // =========================
   Future<void> fetchUsers() async {
-    try {
-      final res = await ApiClient.dio.get("/api/users");
-      final data = res.data as List;
+    final result = await ApiService.getUsers();
 
-      setState(() {
-        users = data.map((e) => UserDto.fromJson(e)).toList();
-        loading = false;
-      });
-    } on DioException catch (e) {
-      debugPrint(e.message);
-      setState(() => loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Kullanıcılar yüklenemedi")),
-      );
-    }
+    setState(() {
+      users = result;
+      loading = false;
+    });
   }
 
   // =========================
@@ -229,8 +221,8 @@ class UserDto {
 
   factory UserDto.fromJson(Map<String, dynamic> json) {
     return UserDto(
-      id: json["id"],
-      username: json["username"],
+      id: json["id"]?.toString() ?? "",
+      username: json["username"] ?? "Unknown",
     );
   }
 }
