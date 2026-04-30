@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_client.dart';
@@ -21,13 +20,13 @@ class _PostAddPageState extends State<PostAddPage> {
   final _linkController = TextEditingController();
 
   String? _selectedCommunityName;
-  File? _selectedImage;
-  File? _selectedVideo;
+
+  // ✅ MULTIPLE MEDIA
+  List<File> _selectedMedia = [];
 
   bool _loading = false;
 
-  // ✅ COMMUNITY STATE
-  String? _selectedCommunityId;
+  // COMMUNITY
   List<Map<String, dynamic>> _communities = [];
   bool _loadingCommunities = true;
 
@@ -37,13 +36,12 @@ class _PostAddPageState extends State<PostAddPage> {
     _fetchCommunities();
   }
 
-  // ================= COMMUNITY FETCH =================
+  // ================= COMMUNITY =================
   Future<void> _fetchCommunities() async {
     try {
       final response = await ApiClient.dio.get("/api/communities");
 
       final data = response.data;
-
       List listData = data is List ? data : data["data"];
 
       setState(() {
@@ -59,37 +57,36 @@ class _PostAddPageState extends State<PostAddPage> {
     }
   }
 
-  /// Foto seç
-  Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (picked != null) {
+  // ================= MEDIA =================
+
+  Future<void> _pickImages() async {
+    final picked = await ImagePicker().pickMultiImage();
+
+    if (picked.isNotEmpty) {
       setState(() {
-        _selectedImage = File(picked.path);
-        _selectedVideo = null;
+        _selectedMedia.addAll(picked.map((e) => File(e.path)));
       });
     }
   }
 
-  /// Video seç
   Future<void> _pickVideo() async {
     final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+
     if (picked != null) {
       setState(() {
-        _selectedVideo = File(picked.path);
-        _selectedImage = null;
+        _selectedMedia.add(File(picked.path));
       });
     }
   }
 
-  /// Media sil
-  void _removeMedia() {
+  void _removeMedia(int index) {
     setState(() {
-      _selectedImage = null;
-      _selectedVideo = null;
+      _selectedMedia.removeAt(index);
     });
   }
 
   // ================= UPLOAD =================
+
   Future<void> _uploadPost() async {
     setState(() => _loading = true);
 
@@ -112,22 +109,22 @@ class _PostAddPageState extends State<PostAddPage> {
         "tags": tags,
         "user": userId,
 
-        // ✅ DOĞRU
         if (_selectedCommunityName != null)
           "community": _selectedCommunityName,
-
-        if (_selectedImage != null)
-          "Media": await MultipartFile.fromFile(
-            _selectedImage!.path,
-            filename: "image.jpg",
-          ),
-
-        if (_selectedVideo != null)
-          "Media": await MultipartFile.fromFile(
-            _selectedVideo!.path,
-            filename: "video.mp4",
-          ),
       });
+
+      // ✅ MULTIPLE FILE SEND
+      for (var file in _selectedMedia) {
+        formData.files.add(
+          MapEntry(
+            "MediaFiles",
+            await MultipartFile.fromFile(
+              file.path,
+              filename: file.path.split('/').last,
+            ),
+          ),
+        );
+      }
 
       final response = await ApiClient.dio.post(
         "/api/posts",
@@ -153,6 +150,7 @@ class _PostAddPageState extends State<PostAddPage> {
   }
 
   // ================= UI =================
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -175,26 +173,22 @@ class _PostAddPageState extends State<PostAddPage> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ✅ COMMUNITY DROPDOWN
+            // COMMUNITY
             _loadingCommunities
-                ? const Center(child: CircularProgressIndicator())
-                :DropdownButtonFormField<String>(
+                ? const CircularProgressIndicator()
+                : DropdownButtonFormField<String>(
               value: _selectedCommunityName,
               hint: const Text("Topluluk seç"),
-              items: _communities.map((community) {
+              items: _communities.map((c) {
                 return DropdownMenuItem<String>(
-                  value: community["name"], // 🔥 ID değil NAME
-                  child: Text(community["name"]),
+                  value: c["name"],
+                  child: Text(c["name"]),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCommunityName = value;
-                });
-              },
+              onChanged: (v) => setState(() {
+                _selectedCommunityName = v;
+              }),
             ),
 
             const SizedBox(height: 12),
@@ -203,18 +197,22 @@ class _PostAddPageState extends State<PostAddPage> {
               controller: _titleController,
               decoration: const InputDecoration(labelText: "Başlık"),
             ),
+
             const SizedBox(height: 12),
 
             TextField(
               controller: _tagsController,
-              decoration: const InputDecoration(labelText: "Etiketler (virgülle)"),
+              decoration:
+              const InputDecoration(labelText: "Etiketler (virgülle)"),
             ),
+
             const SizedBox(height: 12),
 
             TextField(
               controller: _linkController,
               decoration: const InputDecoration(labelText: "Link"),
             ),
+
             const SizedBox(height: 12),
 
             TextField(
@@ -225,52 +223,48 @@ class _PostAddPageState extends State<PostAddPage> {
 
             const SizedBox(height: 16),
 
-            if (_selectedImage != null)
-              Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      _selectedImage!,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: _removeMedia,
-                    ),
-                  ),
-                ],
-              ),
+            // ✅ MEDIA PREVIEW
+            if (_selectedMedia.isNotEmpty)
+              SizedBox(
+                height: 200,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedMedia.length,
+                  itemBuilder: (context, index) {
+                    final file = _selectedMedia[index];
+                    final isVideo = file.path.endsWith(".mp4") ||
+                        file.path.endsWith(".mov");
 
-            if (_selectedVideo != null)
-              Stack(
-                children: [
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.black12,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.play_circle_fill, size: 64),
-                    ),
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: _removeMedia,
-                    ),
-                  ),
-                ],
+                    return Stack(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          width: 160,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: isVideo
+                                ? Container(
+                              color: Colors.black12,
+                              child: const Center(
+                                child: Icon(Icons.play_circle_fill,
+                                    size: 50),
+                              ),
+                            )
+                                : Image.file(file, fit: BoxFit.cover),
+                          ),
+                        ),
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: IconButton(
+                            icon: const Icon(Icons.close),
+                            onPressed: () => _removeMedia(index),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
 
             const SizedBox(height: 20),
@@ -280,7 +274,7 @@ class _PostAddPageState extends State<PostAddPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.image),
-                  onPressed: _pickImage,
+                  onPressed: _pickImages, // ✅ FIXED
                 ),
                 IconButton(
                   icon: const Icon(Icons.videocam),

@@ -1,17 +1,13 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
-
 import '../core/api_service.dart';
-import 'full_screen_image.dart';
 import '../my_community/community_detail_page.dart';
 import '../profile_page.dart';
 import '../quote_post_page.dart';
-
-
+import 'full_screen_image.dart';
 import 'inline_video_player.dart';
 
 class PostCard extends StatefulWidget {
@@ -34,21 +30,24 @@ class PostCard extends StatefulWidget {
 }
 
 class _PostCardState extends State<PostCard> {
-
   bool _isSaved = false;
   bool _loadingSaved = true;
+
   bool _isJoined = false;
   bool _loadingJoin = true;
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
+  int _currentIndex = 0; // 🔥 carousel index
+
   @override
   void initState() {
     super.initState();
-
     _checkIfSaved();
-    _checkIfJoined(); // sayfa açılır açılmaz katılım kontrolü
+    _checkIfJoined();
   }
+
+  // ================= SAVE =================
   Future<void> _checkIfSaved() async {
     final postId = int.parse(widget.post["id"].toString());
 
@@ -61,11 +60,8 @@ class _PostCardState extends State<PostCard> {
           _loadingSaved = false;
         });
       }
-    } catch (e) {
-      debugPrint("Post kaydedilmiş mi kontrol hatası: $e");
-      if (mounted) {
-        setState(() => _loadingSaved = false);
-      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingSaved = false);
     }
   }
 
@@ -74,42 +70,34 @@ class _PostCardState extends State<PostCard> {
 
     final postId = int.parse(widget.post["id"].toString());
 
-    // 1️⃣ Optimistic update: UI'yi hemen değiştir
     setState(() {
-      _isSaved = !_isSaved;  // ikon anında değişir
-      _loadingSaved = true;  // spinner göstermek için
+      _isSaved = !_isSaved;
+      _loadingSaved = true;
     });
 
     try {
-      // 2️⃣ API çağrısı
       final saved = await ApiService.toggleSavePost(postId);
 
       if (mounted) {
         setState(() {
-          _isSaved = saved;       // API sonucu ile güncelle
-          _loadingSaved = false;  // spinner kapat
-        });
-      }
-    } catch (e) {
-      // 3️⃣ Hata durumunda rollback
-      if (mounted) {
-        setState(() {
-          _isSaved = !_isSaved;  // önceki duruma geri dön
+          _isSaved = saved;
           _loadingSaved = false;
         });
       }
-
-      ScaffoldMessenger.of(widget.parentContext).showSnackBar(
-        SnackBar(content: Text("Kaydetme hatası: $e")),
-      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSaved = !_isSaved;
+          _loadingSaved = false;
+        });
+      }
     }
   }
-  // ================= JOIN / LEAVE =================
-  Future<void> _checkIfJoined() async {
-    final String communityId = widget.post["communityId"].toString();
-    if (communityId == null) return;
 
-    setState(() => _loadingJoin = true);
+  // ================= JOIN =================
+  Future<void> _checkIfJoined() async {
+    final communityId = widget.post["communityId"]?.toString();
+    if (communityId == null) return;
 
     try {
       final joined = await ApiService.isJoined(communityId);
@@ -120,14 +108,13 @@ class _PostCardState extends State<PostCard> {
           _loadingJoin = false;
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) setState(() => _loadingJoin = false);
-      debugPrint("Katılım kontrol hatası: $e");
     }
   }
 
   Future<void> _toggleJoin() async {
-    final String communityId = widget.post["communityId"].toString();
+    final communityId = widget.post["communityId"]?.toString();
     if (communityId == null) return;
 
     setState(() => _loadingJoin = true);
@@ -142,163 +129,128 @@ class _PostCardState extends State<PostCard> {
       }
 
       if (mounted) setState(() {});
-
-      widget.onJoinCommunity?.call(
-        widget.post["community"],
-        widget.post["id"],
-      );
-    } catch (e) {
+    } catch (_) {
       ScaffoldMessenger.of(widget.parentContext)
-          .showSnackBar(SnackBar(content: Text("İşlem başarısız: $e")));
+          .showSnackBar(const SnackBar(content: Text("İşlem başarısız")));
     } finally {
       if (mounted) setState(() => _loadingJoin = false);
     }
   }
 
+  // ================= MEDIA =================
+  Widget _buildMedia(List medias) {
+    if (medias.isEmpty) return const SizedBox.shrink();
 
+    return Column(
+      children: [
+        SizedBox(
+          height: 300,
+          child: PageView.builder(
+            itemCount: medias.length,
+            onPageChanged: (i) => setState(() => _currentIndex = i),
+            itemBuilder: (context, index) {
+              final media = medias[index];
+              final url = media["url"];
+              final type = media["type"];
 
+              if (url == null) return const SizedBox.shrink();
 
-  // ================= VIDEO THUMBNAIL =================
+              // VIDEO
+              if (type == "video") {
+                return InlineVideoPlayer(url: url);
+              }
 
-
-  // ================= MEDIA WIDGET =================
-  Widget _buildMediaWidget(String? url) {
-    if (url == null) return const SizedBox.shrink();
-
-    final path = Uri.parse(url).path.toLowerCase();
-
-    // ================= VIDEO =================
-    if (path.endsWith(".mp4") ||
-        path.endsWith(".mov") ||
-        path.endsWith(".avi") ||
-        path.endsWith(".webm")) {
-
-      return InlineVideoPlayer(url: url);
-    }
-
-    // ================= IMAGE =================
-    if (path.endsWith(".jpg") ||
-        path.endsWith(".jpeg") ||
-        path.endsWith(".png") ||
-        path.endsWith(".gif")) {
-
-      return GestureDetector(
-        onTap: () {
-          Navigator.push(
-            widget.parentContext,
-            MaterialPageRoute(
-              builder: (_) => FullScreenImagePage(imageUrl: url),
-            ),
-          );
-        },
-        child: AspectRatio(
-          aspectRatio: 7 / 8,
-          child: Image.network(
-            url,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return const Center(child: Icon(Icons.broken_image));
+              // IMAGE
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    widget.parentContext,
+                    MaterialPageRoute(
+                      builder: (_) => FullScreenImagePage(imageUrl: url),
+                    ),
+                  );
+                },
+                child: Image.network(
+                  url,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              );
             },
           ),
         ),
-      );
-    }
 
-    // ================= UNKNOWN =================
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: Theme.of(widget.parentContext).colorScheme.surfaceVariant,
-      child: const Center(child: Text("Desteklenmeyen medya türü")),
+        if (medias.length > 1)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(medias.length, (index) {
+              return Container(
+                margin: const EdgeInsets.all(3),
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _currentIndex == index
+                      ? Colors.black
+                      : Colors.grey,
+                ),
+              );
+            }),
+          ),
+      ],
     );
   }
 
   // ================= BUILD =================
   @override
   Widget build(BuildContext context) {
+    final post = widget.post;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final post = widget.post;
+
     final postId = post["id"];
+    final medias = post["medias"] as List<dynamic>? ?? [];
+
     final profileImage = post["profileImageUrl"];
+
     return Container(
       color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // HEADER
           ListTile(
             leading: CircleAvatar(
-      radius: 20,
-        backgroundColor: colors.surfaceVariant,
-        child: ClipOval(
-          child: profileImage != null && profileImage.isNotEmpty
-              ? Image.network(
-            profileImage,
-            width: 40,
-            height: 40,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(Icons.person),
-          )
-              : Icon(Icons.person, color: colors.onSurfaceVariant),
-        ),
-      ),
+              child: profileImage != null && profileImage.toString().isNotEmpty
+                  ? ClipOval(
+                child: Image.network(
+                  profileImage,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                ),
+              )
+                  : const Icon(Icons.person),
+            ),
             title: Row(
               children: [
-                GestureDetector(
-                  onTap: () {
-                    final username = post["username"];
-                    if (username != null) {
-                      Navigator.push(
-                        widget.parentContext,
-                        MaterialPageRoute(
-                          builder: (_) => ProfilePage(username: username),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    "${post["username"] ?? "user"} • ",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-
-                GestureDetector(
-                  onTap: () {
-                    final communityName = post["community"];
-                    if (communityName != null) {
-                      Navigator.push(
-                        widget.parentContext,
-                        MaterialPageRoute(
-                          builder: (_) => CommunityDetailPage(
-                            communityName: communityName,
-                          ),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    "${post["community"] ?? ""}",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
+                Text(post["username"] ?? "user",
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 6),
+                Text(post["community"] ?? "",
+                    style: TextStyle(color: colors.primary)),
               ],
             ),
             subtitle: Text(
               post["created_at"] != null
-                  ? TimeAgo.format(widget.parentContext, DateTime.parse(post["created_at"]))
+                  ? TimeAgo.format(
+                context,
+                DateTime.parse(post["created_at"]),
+              )
                   : "",
             ),
             trailing: _loadingJoin
-                ? const SizedBox(
-              width: 80,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            )
+                ? const CircularProgressIndicator(strokeWidth: 2)
                 : (!_isJoined
                 ? TextButton(
               onPressed: _toggleJoin,
@@ -307,90 +259,71 @@ class _PostCardState extends State<PostCard> {
                 : const SizedBox.shrink()),
           ),
 
-          if (post["imageUrl"] != null || post["image_url"] != null)
-            _buildMediaWidget(post["imageUrl"] ?? post["image_url"]),
+          // 🔥 MEDIA
+          if (medias.isNotEmpty) _buildMedia(medias),
 
+          // CONTENT
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Text(
-              post["content"] ?? "",
-              style: theme.textTheme.bodyMedium,
-            ),
+            padding: const EdgeInsets.all(12),
+            child: Text(post["content"] ?? ""),
           ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_upward,
-                    color: post["user_vote"] == 1 ? colors.primary : colors.onSurfaceVariant,
-                  ),
-                  onPressed: () => widget.onVote?.call(postId, 1),
+          // ACTIONS
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_upward,
+                  color: post["user_vote"] == 1
+                      ? colors.primary
+                      : colors.onSurfaceVariant,
                 ),
-                Text("${post["votes_count"] ?? 0}"),
-                IconButton(
-                  icon: Icon(
-                    Icons.arrow_downward,
-                    color: post["user_vote"] == -1 ? colors.error : colors.onSurfaceVariant,
-                  ),
-                  onPressed: () => widget.onVote?.call(postId, -1),
+                onPressed: () => widget.onVote?.call(postId, 1),
+              ),
+              Text("${post["votes_count"] ?? 0}"),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_downward,
+                  color: post["user_vote"] == -1
+                      ? colors.error
+                      : colors.onSurfaceVariant,
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.comment_outlined),
-                  onPressed: () {
-                    Navigator.push(
-                      widget.parentContext,
-                      MaterialPageRoute(
-                        builder: (_) => CommentPage(postId: postId),
-                      ),
-                    );
-                  },
-                ),
-                Text("${post["commentCount"] ?? 0}"),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.repeat),
-                  onPressed: () {
-                    Navigator.push(
-                      widget.parentContext,
-                      MaterialPageRoute(
-                        builder: (_) => QuotePostPage(post: post),
-                      ),
-                    );
-                  },
-                ),
-                IconButton(
-                  onPressed: _loadingSaved ? null : _toggleSave,
-                  icon: AnimatedSwitcher(
-                    duration: Duration(milliseconds: 200),
-                    transitionBuilder: (child, animation) => ScaleTransition(
-                      scale: animation,
-                      child: child,
+                onPressed: () => widget.onVote?.call(postId, -1),
+              ),
+              IconButton(
+                icon: const Icon(Icons.comment),
+                onPressed: () {
+                  Navigator.push(
+                    widget.parentContext,
+                    MaterialPageRoute(
+                      builder: (_) => CommentPage(postId: postId),
                     ),
-                    child: _loadingSaved
-                        ? SizedBox(
-                      key: ValueKey("spinner"),
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _isSaved ? Colors.orange : Colors.grey,
-                      ),
-                    )
-                        : Icon(
-                      _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                      key: ValueKey("icon"),
-                      color: _isSaved ? Colors.orange : Colors.grey,
+                  );
+                },
+              ),
+              Text("${post["commentCount"] ?? 0}"),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.repeat),
+                onPressed: () {
+                  Navigator.push(
+                    widget.parentContext,
+                    MaterialPageRoute(
+                      builder: (_) => QuotePostPage(post: post),
                     ),
-                  ),
-                )
-              ],
-            ),
+                  );
+                },
+              ),
+              IconButton(
+                onPressed: _toggleSave,
+                icon: Icon(
+                  _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                ),
+              ),
+            ],
           ),
-          const Divider(height: 1),
+
+          const Divider(),
         ],
       ),
     );

@@ -109,6 +109,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
   }
   Widget _buildThumbnail(
       String? mediaUrl,
+      String? mediaType,
       String? content,
       String? username,
       String? avatarUrl,
@@ -313,7 +314,13 @@ class SavedPostsPageState extends State<SavedPostsPage> {
             }
 
             final post = posts[index];
-            final mediaUrl = post["imageUrl"];
+            String? mediaType;
+            String? mediaUrl;
+
+            if (post["medias"] != null && (post["medias"] as List).isNotEmpty) {
+              mediaUrl = post["medias"][0]["url"];
+              mediaType = post["medias"][0]["type"]; // image / video
+            }
             final content = post["content"]; // backend'e göre değişebilir
             final username = post["username"];
             final avatarUrl = post["profileImageUrl"];
@@ -333,11 +340,11 @@ class SavedPostsPageState extends State<SavedPostsPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: _buildThumbnail(
                   mediaUrl,
+                  mediaType,
                   content,
                   username,
                   avatarUrl,
-
-                ),
+                )
               ),
             );
           },
