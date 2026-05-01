@@ -210,19 +210,18 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     });
 
     try {
-      // 🔥 ARTIK DOĞRU ENDPOINT
       final response = await ApiClient.dio.get(
         '/api/communities/${widget.communityName}',
       );
 
-      final data = response.data;
+      final data = Map<String, dynamic>.from(response.data);
 
       setState(() {
         community = {
           'id': data['id'],
           'name': data['name'],
           'description': data['description'] ?? '',
-          'image': data['iconUrl'], // 🔥 ARTIK DOĞRU KAYNAK
+          'image': data['iconUrl'],
           'banner': data['bannerUrl'],
           'memberCount': data['memberCount'],
           'isMember': data['isMember'],
@@ -231,23 +230,27 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         isLoading = false;
       });
 
-      // 🔥 posts hala ayrı endpointten gelebilir (istersen bırak)
-      final postsResponse = await ApiClient.dio.get(
+      // 🔥 POSTS FETCH (SAFE)
+      final response2 = await ApiClient.dio.get(
         '/api/posts/community/byname/${widget.communityName}',
       );
 
-      final raw = List<Map<String, dynamic>>.from(postsResponse.data);
+// 🔥 OUTER MAP
+      final Map<String, dynamic> body =
+      Map<String, dynamic>.from(response2.data);
 
-      final mappedPosts = raw.map((p) {
+// 🔥 INNER LIST
+      final List rawList = body["data"] as List;
+
+      final mappedPosts = rawList.map((p) {
+        final map = Map<String, dynamic>.from(p);
+
         return {
-          ...p,
-          "votes_count": p["netScore"] ?? 0,
-          "user_vote": p["userVote"] ?? 0,
-          "created_at": p["createdAt"],
-          "community": p["community"],
-          "communityId": p["communityId"],
-          "comment_count": p["commentCount"] ?? 0,
-          "profileImageUrl": p["profileImageUrl"],
+          ...map,
+          "votes_count": map["netScore"] ?? 0,
+          "user_vote": map["userVote"] ?? 0,
+          "created_at": map["createdAt"],
+          "comment_count": map["commentCount"] ?? 0,
         };
       }).toList();
 
@@ -257,15 +260,18 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       });
 
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         error = e.toString();
         isLoading = false;
       });
+
+      debugPrint("COMMUNITY LOAD ERROR: $e");
     }
 
     _checkIfJoined();
   }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) {

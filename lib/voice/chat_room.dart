@@ -371,6 +371,14 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
         maxMembers: maxMembers,
       );
 
+      // 🔥 ODAYA DİREKT GİR
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VoiceRoomPage(roomId: roomId),
+        ),
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Oda oluşturuldu! ID: $roomId")),
       );

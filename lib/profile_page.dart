@@ -39,21 +39,28 @@ class _ProfilePageState extends State<ProfilePage>
         '/api/posts/user/${widget.username}',
       );
 
-      final raw = List<Map<String, dynamic>>.from(postRes.data);
+      // 🔥 OUTER RESPONSE MAP
+      final Map<String, dynamic> body =
+      Map<String, dynamic>.from(postRes.data);
 
-      final mappedPosts = raw.map((p) {
+      // 🔥 INNER LIST
+      final List rawList = body["data"] as List;
+
+      final mappedPosts = rawList.map((p) {
+        final map = Map<String, dynamic>.from(p);
+
         return {
-          ...p,
-          "votes_count": p["netScore"] ?? 0,
-          "user_vote": p["userVote"] ?? 0,
-          "created_at": p["createdAt"],
-          "community": p["community"],
-          "communityId": p["communityId"],
-          "comment_count": p["commentCount"] ?? 0,
+          ...map,
+          "votes_count": map["netScore"] ?? 0,
+          "user_vote": map["userVote"] ?? 0,
+          "created_at": map["createdAt"],
+          "community": map["community"],
+          "communityId": map["communityId"],
+          "comment_count": map["commentCount"] ?? 0,
         };
       }).toList();
 
-      if (!mounted) return; // 🔥 KRİTİK
+      if (!mounted) return;
 
       setState(() {
         user = Map<String, dynamic>.from(userRes.data);
@@ -61,9 +68,13 @@ class _ProfilePageState extends State<ProfilePage>
         loading = false;
       });
     } catch (e) {
-      if (!mounted) return; // 🔥 BURAYA DA
+      if (!mounted) return;
 
-      setState(() => loading = false);
+      setState(() {
+        loading = false;
+      });
+
+      debugPrint("PROFILE LOAD ERROR: $e");
     }
   }
 

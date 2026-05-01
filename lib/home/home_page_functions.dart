@@ -27,16 +27,30 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
       },
     );
 
-    final raw = List<Map<String, dynamic>>.from(response.data);
+    // 🔥 BACKEND WRAPPER FIX
+    final data = response.data;
+    debugPrint("RESPONSE: ${response.data.runtimeType}");
+    debugPrint("RESPONSE BODY: ${response.data}");
+    if (data["success"] != true) {
+      throw Exception(data["message"]);
+    }
 
-    final posts = raw.map((p) {
+    final List raw = data["data"] ?? [];
+
+    final posts = raw.map((item) {
+      final p = Map<String, dynamic>.from(item); // 🔥 KRİTİK SATIR
+
       return {
-        ...p, // Backend'den gelen her şey aynen kalsın
+        ...p,
+
         "votes_count": p["netScore"] ?? 0,
         "user_vote": p["userVote"] ?? 0,
-        // Sadece tarih ve community için mapping
+
         "created_at": p["createdAt"],
         "community_name": p["community"],
+
+        "medias": p["medias"] ?? [],
+        "commentCount": p["commentCount"] ?? 0,
       };
     }).toList();
 
@@ -48,6 +62,8 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
       state.isLoadingMore = false;
     });
   } catch (e) {
+    debugPrint("FETCH POSTS ERROR: $e");
+
     state.setState(() {
       state.loading = false;
       state.isLoadingMore = false;
@@ -139,14 +155,6 @@ Future<void> toggleSave(
     });
   }
 }
-
-
-
-
-
-
-
-
 
 
 /// =======================================================

@@ -203,6 +203,7 @@ class _PostCardState extends State<PostCard> {
 
   // ================= BUILD =================
   @override
+  @override
   Widget build(BuildContext context) {
     final post = widget.post;
     final theme = Theme.of(context);
@@ -210,7 +211,6 @@ class _PostCardState extends State<PostCard> {
 
     final postId = post["id"];
     final medias = post["medias"] as List<dynamic>? ?? [];
-
     final profileImage = post["profileImageUrl"];
 
     return Container(
@@ -218,29 +218,70 @@ class _PostCardState extends State<PostCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // HEADER
+
+          // ================= HEADER =================
           ListTile(
             leading: CircleAvatar(
-              child: profileImage != null && profileImage.toString().isNotEmpty
-                  ? ClipOval(
-                child: Image.network(
-                  profileImage,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                ),
-              )
-                  : const Icon(Icons.person),
+              backgroundImage:
+              profileImage != null && profileImage
+                  .toString()
+                  .isNotEmpty
+                  ? NetworkImage(profileImage)
+                  : null,
+              child: profileImage == null || profileImage
+                  .toString()
+                  .isEmpty
+                  ? const Icon(Icons.person)
+                  : null,
             ),
+
             title: Row(
               children: [
-                Text(post["username"] ?? "user",
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                // 👇 USERNAME CLICK → PROFILE
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ProfilePage(
+                          username: post["username"],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    post["username"] ?? "user",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+
                 const SizedBox(width: 6),
-                Text(post["community"] ?? "",
-                    style: TextStyle(color: colors.primary)),
+
+                // 👇 COMMUNITY CLICK → COMMUNITY PAGE
+                GestureDetector(
+                  onTap: () {
+                    if (post["community"] == null) return;
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CommunityDetailPage(
+                          communityName: post["community"],
+                        ),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    post["community"] ?? "",
+                    style: TextStyle(
+                      color: colors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               ],
             ),
+
             subtitle: Text(
               post["created_at"] != null
                   ? TimeAgo.format(
@@ -249,8 +290,13 @@ class _PostCardState extends State<PostCard> {
               )
                   : "",
             ),
+
             trailing: _loadingJoin
-                ? const CircularProgressIndicator(strokeWidth: 2)
+                ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
                 : (!_isJoined
                 ? TextButton(
               onPressed: _toggleJoin,
@@ -259,16 +305,16 @@ class _PostCardState extends State<PostCard> {
                 : const SizedBox.shrink()),
           ),
 
-          // 🔥 MEDIA
+          // ================= MEDIA =================
           if (medias.isNotEmpty) _buildMedia(medias),
 
-          // CONTENT
+          // ================= CONTENT =================
           Padding(
             padding: const EdgeInsets.all(12),
             child: Text(post["content"] ?? ""),
           ),
 
-          // ACTIONS
+          // ================= ACTIONS =================
           Row(
             children: [
               IconButton(
@@ -280,7 +326,9 @@ class _PostCardState extends State<PostCard> {
                 ),
                 onPressed: () => widget.onVote?.call(postId, 1),
               ),
+
               Text("${post["votes_count"] ?? 0}"),
+
               IconButton(
                 icon: Icon(
                   Icons.arrow_downward,
@@ -290,6 +338,7 @@ class _PostCardState extends State<PostCard> {
                 ),
                 onPressed: () => widget.onVote?.call(postId, -1),
               ),
+
               IconButton(
                 icon: const Icon(Icons.comment),
                 onPressed: () {
@@ -301,8 +350,11 @@ class _PostCardState extends State<PostCard> {
                   );
                 },
               ),
+
               Text("${post["commentCount"] ?? 0}"),
+
               const Spacer(),
+
               IconButton(
                 icon: const Icon(Icons.repeat),
                 onPressed: () {
@@ -314,6 +366,7 @@ class _PostCardState extends State<PostCard> {
                   );
                 },
               ),
+
               IconButton(
                 onPressed: _toggleSave,
                 icon: Icon(
@@ -327,5 +380,4 @@ class _PostCardState extends State<PostCard> {
         ],
       ),
     );
-  }
-}
+  }}

@@ -36,18 +36,32 @@ class _CommentPageState extends State<CommentPage> {
       final res = await ApiClient.dio
           .get('/api/comments/post/${widget.postId}');
 
-      comments = List<Map<String, dynamic>>.from(res.data);
+      final body = res.data;
+
+      if (body is! Map || body["data"] == null) {
+        comments = [];
+        setState(() {});
+        return;
+      }
+
+      final List raw = body["data"];
+
+      comments = raw
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
 
       tree = {};
+
       for (var c in comments) {
         final pid = c["parentCommentId"];
+
         tree.putIfAbsent(pid, () => []);
         tree[pid]!.add(c);
       }
 
       setState(() {});
     } catch (e) {
-      print("Yorumları çekerken hata: $e");
+      debugPrint("Yorumları çekerken hata: $e");
     }
   }
 
@@ -64,39 +78,42 @@ class _CommentPageState extends State<CommentPage> {
       _text.clear();
       await _fetchComments();
     } catch (e) {
-      print("Yorum eklerken hata: $e");
+      debugPrint("Yorum eklerken hata: $e");
     }
   }
-
   Future<void> _addReply(int parentId, String content) async {
-    if (content.trim().isEmpty) return;
+    final text = content.trim();
+    if (text.isEmpty) return;
 
     try {
       await ApiClient.dio.post('/api/comments', data: {
         "postId": widget.postId,
-        "content": content,
+        "content": text,
         "parentId": parentId,
       });
 
-      _fetchComments();
+      await _fetchComments();
     } catch (e) {
-      print("Yanıt eklerken hata: $e");
+      debugPrint("Yanıt eklerken hata: $e");
     }
   }
 
   Future<void> _voteComment(int commentId, int vote) async {
     try {
-      await ApiClient.dio.post(
+      final res = await ApiClient.dio.post(
         '/api/comments/$commentId/vote2',
-        data: {
-          "vote": vote,
-        },
+        data: {"vote": vote},
       );
 
-      await _fetchComments();
+      final body = res.data;
 
+      if (body is Map && body["success"] == false) {
+        throw Exception(body["message"]);
+      }
+
+      await _fetchComments();
     } catch (e) {
-      print("Oy verirken hata: $e");
+      debugPrint("Oy verirken hata: $e");
     }
   }
 
