@@ -8,6 +8,7 @@ import 'package:mootable/voice/voice_signalr.dart';
 
 import '../core/api_service.dart';
 
+
 class ChatRoomPage extends StatelessWidget {
   const ChatRoomPage({super.key});
 
@@ -240,11 +241,16 @@ class _DavetlerViewState extends State<DavetlerView> {
     final data = await ApiService.getMyInvites();
 
     setState(() {
-      invites = data;
+      for (var newInvite in data) {
+        final exists = invites.any((x) => x["id"] == newInvite["id"]);
+        if (!exists) {
+          invites.add(newInvite);
+        }
+      }
+
       isLoading = false;
     });
   }
-
   Future<void> handleAccept(Map<String, dynamic> invite) async {
     final inviteId = invite["id"];
     final roomId = invite["roomId"] ?? invite["RoomId"] ?? invite["voiceRoomId"];
@@ -304,12 +310,29 @@ class _DavetlerViewState extends State<DavetlerView> {
       itemBuilder: (context, index) {
         final invite = invites[index];
 
-        final senderName = invite["senderUsername"] ?? "Biri";
+
+        final sender = invite["sender"] ?? invite["Sender"] ?? {};
+
+        final senderName =
+            sender["userName"] ??
+                sender["username"] ??
+                sender["UserName"] ??
+                "Biri";
+
+        final senderImage =
+            sender["profileImage"] ??
+                sender["profileImageUrl"] ??
+                sender["ProfileImageUrl"];
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: ListTile(
-            leading: const Icon(Icons.person),
+            leading: CircleAvatar(
+              backgroundImage: senderImage != null
+                  ? NetworkImage(senderImage)
+                  : null,
+              child: senderImage == null ? const Icon(Icons.person) : null,
+            ),
             title: Text("$senderName seni odaya davet etti"),
             subtitle: Row(
               children: [
@@ -330,7 +353,6 @@ class _DavetlerViewState extends State<DavetlerView> {
     );
   }
 }
-
 class SohbetBaslatView extends StatefulWidget {
   const SohbetBaslatView({super.key});
 
@@ -371,7 +393,6 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
         maxMembers: maxMembers,
       );
 
-      // 🔥 ODAYA DİREKT GİR
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -407,17 +428,13 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: "Oda adı",
-                ),
+                decoration: const InputDecoration(labelText: "Oda adı"),
               ),
               const SizedBox(height: 10),
               TextField(
                 controller: countController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Kişi sayısı",
-                ),
+                decoration: const InputDecoration(labelText: "Kişi sayısı"),
               ),
             ],
           ),
@@ -449,106 +466,138 @@ class _SohbetBaslatViewState extends State<SohbetBaslatView> {
     );
   }
 
+  /// 🔥 DISCORD TARZI CARD
+  Widget _buildRoomCard(dynamic room) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        final roomId = room["id"];
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VoiceRoomPage(roomId: roomId),
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF2B2D31),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.05)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5865F2).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.graphic_eq,
+                color: Color(0xFF5865F2),
+                size: 22,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              room["name"] ?? "Oda ${room["id"]}",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.people, size: 14, color: Colors.white54),
+                const SizedBox(width: 4),
+                Text(
+                  "${room["maxMembers"] ?? "-"} kişi",
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          /// 🔵 ÜSTTE BUTON
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _creating
-                  ? null
-                  : _showCreateRoomDialog, // ✅ BURASI DÜZELTİLDİ
-              icon: _creating
-                  ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-                  : const Icon(Icons.add),
-              label: const Text("Yeni Sohbet Başlat"),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          /// 📋 ALTTA ODA LİSTESİ
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _rooms.isEmpty
-                ? const Center(child: Text("Henüz oda yok"))
-                : GridView.builder(
-              itemCount: _rooms.length,
-              gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1,
-              ),
-              itemBuilder: (context, index) {
-                final room = _rooms[index];
-
-                return InkWell(
-                  onTap: () {
-                    final roomId = room["id"];
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            VoiceRoomPage(roomId: roomId),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4B5CFF),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.mic,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          room["name"] ??
-                              "Oda ${room["id"]}", // ✅ isim göster
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Kapasite: ${room["maxMembers"] ?? "-"}",
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+    return Container(
+      color: const Color(0xFF1E1F22), // 🔥 arka plan
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            /// 🔵 BUTON
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _creating ? null : _showCreateRoomDialog,
+                icon: _creating
+                    ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
-                );
-              },
+                )
+                    : const Icon(Icons.add),
+                label: const Text("Yeni Sohbet Başlat"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5865F2),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(height: 20),
+
+            /// 📋 LİSTE
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _rooms.isEmpty
+                  ? const Center(child: Text("Henüz oda yok"))
+                  : GridView.builder(
+                itemCount: _rooms.length,
+                gridDelegate:
+                const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1,
+                ),
+                itemBuilder: (context, index) {
+                  return _buildRoomCard(_rooms[index]);
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

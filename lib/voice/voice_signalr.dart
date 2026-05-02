@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 import '../core/auth_service.dart';
+
 
 class VoiceSignalR {
   late HubConnection connection;
@@ -18,7 +20,7 @@ class VoiceSignalR {
   Future<void> connect({int retries = 3, Duration timeout = const Duration(seconds: 10)}) async {
     connection = HubConnectionBuilder()
         .withUrl(
-      "http://10.0.2.2:5004/voicehub",
+      "http://192.168.0.31:5004/voicehub",
       options: HttpConnectionOptions(
         accessTokenFactory: () async {
           final token = await AuthService.getToken();
@@ -40,14 +42,34 @@ class VoiceSignalR {
 
         final raw = args[0];
 
-        if (raw is Map) {
-          final invite = Map<String, dynamic>.from(raw);
-          onInvite?.call(invite);
-        } else {
-          print("Invite format hatalı: $raw");
-        }
-      } catch (e) {
-        print("ReceiveInvite parse error: $e");
+        if (raw is! Map) return;
+
+        final map = Map<String, dynamic>.from(raw);
+
+        // 🔥 FULL normalize (TEK FORMAT)
+        final invite = {
+          "id": map["id"] ?? map["Id"],
+          "roomId": map["roomId"] ?? map["RoomId"],
+
+          "sender": {
+            "id": map["sender"]?["id"] ?? map["Sender"]?["Id"],
+            "userName": map["sender"]?["userName"] ??
+                map["sender"]?["username"] ??
+                map["Sender"]?["UserName"],
+
+            "profileImage": map["sender"]?["profileImage"] ??
+                map["sender"]?["profileImageUrl"] ??
+                map["Sender"]?["ProfileImageUrl"],
+          }
+        };
+
+        // 🔥 kritik validation
+        if (invite["id"] == null || invite["roomId"] == null) return;
+
+        onInvite?.call(invite);
+      } catch (e, s) {
+        debugPrint("ReceiveInvite parse error: $e");
+        debugPrintStack(stackTrace: s);
       }
     });
     connection.on("ReceiveAnswer", (args) {
