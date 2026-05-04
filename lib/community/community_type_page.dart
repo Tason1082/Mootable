@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -36,6 +37,7 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
     setState(() => isLoading = true);
 
     try {
+      /// 1️⃣ COMMUNITY CREATE
       final response = await ApiClient.dio.post(
         "/api/communities",
         data: {
@@ -49,17 +51,35 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
-        );
+      final communityId = response.data["data"]["id"];
 
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-              (_) => false,
+      /// 2️⃣ BANNER UPLOAD
+      if (widget.bannerUrl != null) {
+        await _uploadImage(
+          communityId,
+          widget.bannerUrl!,
+          "banner",
         );
       }
+
+      /// 3️⃣ ICON UPLOAD
+      if (widget.iconUrl != null) {
+        await _uploadImage(
+          communityId,
+          widget.iconUrl!,
+          "icon",
+        );
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+            (_) => false,
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
@@ -68,7 +88,26 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
       setState(() => isLoading = false);
     }
   }
+  Future<void> _uploadImage(
+      String communityId,
+      String filePath,
+      String type,
+      ) async {
+    final fileName = filePath.split('/').last;
 
+    FormData formData = FormData.fromMap({
+      "file": await MultipartFile.fromFile(
+        filePath,
+        filename: fileName,
+      ),
+      "type": type,
+    });
+
+    await ApiClient.dio.post(
+      "/api/communities/$communityId/upload-image",
+      data: formData,
+    );
+  }
 
 
   @override

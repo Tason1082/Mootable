@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'topic_selection_page.dart';
-//2
+
 class CommunityCustomizePage extends StatefulWidget {
   final String name;
   final String description;
@@ -28,6 +28,7 @@ class _CommunityCustomizePageState extends State<CommunityCustomizePage> {
   Future<void> _pickBanner() async {
     final XFile? picked =
     await _picker.pickImage(source: ImageSource.gallery);
+
     if (picked != null) {
       setState(() {
         bannerImage = File(picked.path);
@@ -38,6 +39,7 @@ class _CommunityCustomizePageState extends State<CommunityCustomizePage> {
   Future<void> _pickIcon() async {
     final XFile? picked =
     await _picker.pickImage(source: ImageSource.gallery);
+
     if (picked != null) {
       setState(() {
         iconImage = File(picked.path);
@@ -92,7 +94,7 @@ class _CommunityCustomizePageState extends State<CommunityCustomizePage> {
             ),
             const SizedBox(height: 10),
 
-            /// REDDIT TARZI PREVIEW
+            /// PREVIEW
             SizedBox(
               height: 200,
               child: Stack(
@@ -114,7 +116,7 @@ class _CommunityCustomizePageState extends State<CommunityCustomizePage> {
                     ),
                   ),
 
-                  /// ICON (YUVARLAK – REDDIT GİBİ)
+                  /// ICON
                   Positioned(
                     left: 16,
                     bottom: 0,
@@ -169,4 +171,3 @@ class _CommunityCustomizePageState extends State<CommunityCustomizePage> {
     );
   }
 }
-
