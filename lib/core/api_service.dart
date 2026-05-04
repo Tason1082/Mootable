@@ -126,27 +126,53 @@ class ApiService {
 
   static Future<bool> isJoined(String communityId) async {
     try {
-      final response = await ApiClient.dio.get("/api/communities/$communityId/is_joined");
-      return response.data?["isJoined"] ?? false;
+      final response = await ApiClient.dio.get(
+        "/api/communities/$communityId/is_joined",
+      );
+
+      final body = response.data;
+
+      if (body is Map && body["success"] == true) {
+        return body["data"]?["isJoined"] ?? false;
+      }
+
+      return false;
     } catch (e) {
       print("ERROR isJoined: $e");
       return false;
     }
   }
-
   static Future<void> joinCommunity(String communityId) async {
     try {
-      await ApiClient.dio.post("/api/communities/$communityId/join");
+      final response = await ApiClient.dio.post(
+        "/api/communities/$communityId/join",
+      );
+
+      final body = response.data;
+
+      if (body is Map && body["success"] != true) {
+        throw Exception(body["message"]);
+      }
     } catch (e) {
       print("ERROR joinCommunity: $e");
+      rethrow;
     }
   }
 
   static Future<void> leaveCommunity(String communityId) async {
     try {
-      await ApiClient.dio.delete("/api/communities/$communityId/leave");
+      final response = await ApiClient.dio.delete(
+        "/api/communities/$communityId/leave",
+      );
+
+      final body = response.data;
+
+      if (body is Map && body["success"] != true) {
+        throw Exception(body["message"]);
+      }
     } catch (e) {
       print("ERROR leaveCommunity: $e");
+      rethrow;
     }
   }
 
@@ -154,8 +180,21 @@ class ApiService {
 
   static Future<List<Map<String, dynamic>>> getMyCommunities() async {
     try {
-      final response = await ApiClient.dio.get("/api/communities/my");
-      return List<Map<String, dynamic>>.from(response.data);
+      final response = await ApiClient.dio.get(
+        "/api/communities/my",
+      );
+
+      final body = response.data;
+
+      if (body is Map && body["success"] != true) {
+        throw Exception(body["message"]);
+      }
+
+      final List raw = body["data"] ?? [];
+
+      return raw
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
     } catch (e) {
       print("ERROR getMyCommunities: $e");
       return [];

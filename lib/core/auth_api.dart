@@ -1,5 +1,4 @@
-import 'package:dio/dio.dart';
-import '../core/api_client.dart';
+import 'api_client.dart';
 
 class AuthApi {
   static Future<String> register(String email, String password) async {
@@ -11,6 +10,13 @@ class AuthApi {
       },
     );
 
-    return response.data["token"];
+    final data = response.data;
+
+    // 🔥 AYNI POSTS MANTIĞI
+    if (data["success"] != true) {
+      throw Exception(data["message"]);
+    }
+
+    return data["data"]["token"];
   }
 }

@@ -78,7 +78,15 @@
   "dayAgo": "{count} gün önce",
   "weekAgo": "{count} hafta önce",
   "monthAgo": "{count} ay önce",
-  "yearAgo": "{count} yıl önce"
+  "yearAgo": "{count} yıl önce",
+
+  "invalidEmailOrPassword": "E-posta veya şifre hatalı",
+  "userNotFound": "Kullanıcı bulunamadı",
+  "commentNotFound": "Yorum bulunamadı",
+  "forbidden": "Bu işlem için yetkiniz yok",
+  "networkError": "Ağ hatası",
+  "unknownError": "Bir hata oluştu"
+
 
 }
 

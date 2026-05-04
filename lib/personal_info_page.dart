@@ -50,7 +50,7 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
           : null;
 
     } catch (e, st) {
-      ErrorHandler.showError(context, e, stackTrace: st);
+
     }
 
     setState(() => loading = false);
@@ -117,7 +117,7 @@ class _PersonalInfoPageState extends State<PersonalInfoPage> {
 
       await ApiClient.dio.put('/api/users', data: data);
     } catch (e, st) {
-      ErrorHandler.showError(context, e, stackTrace: st);
+
     }
 
     setState(() => saving = false);

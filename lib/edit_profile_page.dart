@@ -96,7 +96,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     } catch (e, st) {
       if (!mounted) return;
 
-      ErrorHandler.showError(context, e, stackTrace: st);
+
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.profile_saved_error)),

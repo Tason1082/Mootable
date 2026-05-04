@@ -115,28 +115,43 @@ class _PostCardState extends State<PostCard> {
 
   Future<void> _toggleJoin() async {
     final communityId = widget.post["communityId"]?.toString();
+
     if (communityId == null) return;
 
-    setState(() => _loadingJoin = true);
+    setState(() {
+      _loadingJoin = true;
+    });
+
+    final oldState = _isJoined;
 
     try {
       if (_isJoined) {
         await ApiService.leaveCommunity(communityId);
-        _isJoined = false;
       } else {
         await ApiService.joinCommunity(communityId);
-        _isJoined = true;
       }
 
-      if (mounted) setState(() {});
-    } catch (_) {
-      ScaffoldMessenger.of(widget.parentContext)
-          .showSnackBar(const SnackBar(content: Text("İşlem başarısız")));
+      if (!mounted) return;
+
+      setState(() {
+        _isJoined = !_isJoined;
+      });
+    } catch (e) {
+      _isJoined = oldState;
+
+      if (widget.parentContext.mounted) {
+        ScaffoldMessenger.of(widget.parentContext).showSnackBar(
+          const SnackBar(content: Text("İşlem başarısız")),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _loadingJoin = false);
+      if (mounted) {
+        setState(() {
+          _loadingJoin = false;
+        });
+      }
     }
   }
-
   // ================= MEDIA =================
   Widget _buildMedia(List medias) {
     if (medias.isEmpty) return const SizedBox.shrink();

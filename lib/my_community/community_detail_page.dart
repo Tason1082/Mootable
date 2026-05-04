@@ -124,7 +124,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       "Bu community'ye bak 👇\n$url",
     );
   }
-  
+
   Future<void> _checkIfJoined() async {
     try {
       final communityId = posts.isNotEmpty
@@ -148,7 +148,10 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
   Future<void> _pickAndUploadImage() async {
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
+
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+      );
 
       if (picked == null) return;
 
@@ -159,21 +162,34 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       if (communityId == null) return;
 
       final formData = FormData.fromMap({
-        "file": await MultipartFile.fromFile(picked.path),
-        "type": "icon", // 🔥 önemli
+        "file": await MultipartFile.fromFile(
+          picked.path,
+        ),
+        "type": "icon",
       });
 
-      await ApiClient.dio.post(
+      final response = await ApiClient.dio.post(
         "/api/communities/$communityId/upload-image",
         data: formData,
       );
 
-      // 🔥 tekrar çek (signed url yenilensin)
-      await fetchCommunity();
+      final data = response.data;
 
+      debugPrint("UPLOAD IMAGE RESPONSE: ${response.data.runtimeType}");
+      debugPrint("UPLOAD IMAGE BODY: ${response.data}");
+
+      if (data["success"] != true) {
+        throw Exception(data["message"]);
+      }
+
+      await fetchCommunity();
     } catch (e) {
+      debugPrint("UPLOAD IMAGE ERROR: $e");
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Upload başarısız: $e")),
+        SnackBar(
+          content: Text("Upload başarısız: $e"),
+        ),
       );
     }
   }
@@ -184,23 +200,49 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     if (communityId == null) return;
 
-    setState(() => _loadingJoin = true);
+    setState(() {
+      _loadingJoin = true;
+    });
 
     try {
+      Response response;
+
       if (_isJoined) {
-        await ApiService.leaveCommunity(communityId);
-        _isJoined = false;
+        response = await ApiClient.dio.delete(
+          "/api/communities/$communityId/leave",
+        );
       } else {
-        await ApiService.joinCommunity(communityId);
-        _isJoined = true;
+        response = await ApiClient.dio.post(
+          "/api/communities/$communityId/join",
+        );
       }
+
+      final data = response.data;
+
+      debugPrint("JOIN RESPONSE: ${response.data.runtimeType}");
+      debugPrint("JOIN BODY: ${response.data}");
+
+      if (data["success"] != true) {
+        throw Exception(data["message"]);
+      }
+
+      _isJoined = !_isJoined;
 
       setState(() {});
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("İşlem başarısız: $e")));
+      debugPrint("JOIN ERROR: $e");
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("İşlem başarısız: $e"),
+        ),
+      );
     } finally {
-      if (mounted) setState(() => _loadingJoin = false);
+      if (mounted) {
+        setState(() {
+          _loadingJoin = false;
+        });
+      }
     }
   }
   Future<void> fetchCommunity() async {
@@ -214,7 +256,18 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         '/api/communities/${widget.communityName}',
       );
 
-      final data = Map<String, dynamic>.from(response.data);
+      final body = response.data;
+
+      debugPrint("COMMUNITY RESPONSE: ${response.data.runtimeType}");
+      debugPrint("COMMUNITY BODY: ${response.data}");
+
+      if (body["success"] != true) {
+        throw Exception(body["message"]);
+      }
+
+      final data = Map<String, dynamic>.from(
+        body["data"],
+      );
 
       setState(() {
         community = {
@@ -230,26 +283,33 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         isLoading = false;
       });
 
-      // 🔥 POSTS FETCH (SAFE)
+      // POSTS
       final response2 = await ApiClient.dio.get(
         '/api/posts/community/byname/${widget.communityName}',
       );
 
-// 🔥 OUTER MAP
-      final Map<String, dynamic> body =
-      Map<String, dynamic>.from(response2.data);
+      final postsBody = response2.data;
 
-// 🔥 INNER LIST
-      final List rawList = body["data"] as List;
+      debugPrint("COMMUNITY POSTS RESPONSE: ${response2.data.runtimeType}");
+      debugPrint("COMMUNITY POSTS BODY: ${response2.data}");
+
+      if (postsBody["success"] != true) {
+        throw Exception(postsBody["message"]);
+      }
+
+      final List rawList = postsBody["data"] ?? [];
 
       final mappedPosts = rawList.map((p) {
         final map = Map<String, dynamic>.from(p);
 
         return {
           ...map,
+
           "votes_count": map["netScore"] ?? 0,
           "user_vote": map["userVote"] ?? 0,
+
           "created_at": map["createdAt"],
+
           "comment_count": map["commentCount"] ?? 0,
         };
       }).toList();
@@ -258,16 +318,15 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
         posts = mappedPosts;
         filteredPosts = mappedPosts;
       });
-
     } catch (e) {
       if (!mounted) return;
+
+      debugPrint("COMMUNITY LOAD ERROR: $e");
 
       setState(() {
         error = e.toString();
         isLoading = false;
       });
-
-      debugPrint("COMMUNITY LOAD ERROR: $e");
     }
 
     _checkIfJoined();

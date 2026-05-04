@@ -80,5 +80,11 @@
   "dayAgo": "{count} day ago",
   "weekAgo": "{count} week ago",
   "monthAgo": "{count} mounth ago",
-  "yearAgo": "{count} year ago"
+  "yearAgo": "{count} year ago",
+  "invalidEmailOrPassword": "Invalid email or passwordxx",
+  "userNotFound": "User not found",
+  "commentNotFound": "Comment not found",
+  "forbidden": "You don't have permission to perform this action",
+  "networkError": "Network error",
+  "unknownError": "Something went wrong"
 }

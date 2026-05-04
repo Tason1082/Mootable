@@ -28,10 +28,8 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _login() async {
     try {
-      // 1️⃣ Self-signed sertifikayı kabul et
       ApiClient.allowSelfSignedCerts();
 
-      // 2️⃣ POST isteğini dio ile yap
       final response = await ApiClient.dio.post(
         '/api/auth/login',
         data: {
@@ -42,15 +40,15 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      // 3️⃣ Hata kontrolü
-      if (response.statusCode != 200) {
-        ErrorHandler.showError(context, response.statusCode);
-        return;
+      final data = response.data;
+
+      // 🔥 WRAPPER KONTROL (posts ile aynı)
+      if (data["success"] != true) {
+        throw Exception(data["message"]);
       }
 
-      // 4️⃣ Başarılı ise token al
-      final data = response.data;
-      final token = data["token"];
+      // 🔥 TOKEN ARTIK data["data"] İÇİNDE
+      final token = data["data"]["token"];
 
       await _storage.write(key: "token", value: token);
 
@@ -61,11 +59,11 @@ class _LoginPageState extends State<LoginPage> {
 
       await _storage.write(key: "userId", value: userId.toString());
 
-      // 5️⃣ HomePage’e yönlendir
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
+
     } catch (e, st) {
       ErrorHandler.showError(context, e, stackTrace: st);
     }
