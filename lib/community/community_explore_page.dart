@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/api_client.dart';
+import '../my_community/community_detail_page.dart';
 import '../theme/app_theme.dart';
 
 class CommunityExplorePage extends StatefulWidget {
@@ -151,7 +152,36 @@ class _CommunityExplorePageState
       recommended = [];
     }
   }
+  void _openFullImage(BuildContext context, String? imageUrl) {
+    if (imageUrl == null || imageUrl.isEmpty) return;
 
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (_, __, ___) => Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              Center(
+                child: InteractiveViewer(
+                  child: Image.network(imageUrl),
+                ),
+              ),
+              Positioned(
+                top: 50,
+                left: 12,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   Future<void> _loadUserJoinedCommunities() async {
     try {
       final response =
@@ -387,341 +417,214 @@ class _CommunityExplorePageState
     );
   }
 
-  Widget _communityCard(
-      Map<String, dynamic> c) {
+  Widget _communityCard(Map<String, dynamic> c) {
     final isJoined = _isJoined(c);
 
-    final imageUrl =
-    c["iconUrl"]?.toString();
+    final imageUrl = c["iconUrl"]?.toString();
     final bannerUrl = c["bannerUrl"];
-    final memberCount =
-        c["memberCount"] ?? 0;
+    final memberCount = c["memberCount"] ?? 0;
 
-    return Container(
-      margin:
-      const EdgeInsets.only(bottom: 18),
-      decoration: BoxDecoration(
-        color: const Color(0xff1B1C1F),
-        borderRadius:
-        BorderRadius.circular(24),
-        border: Border.all(
-          color:
-          Colors.white.withOpacity(.05),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
-        children: [
-          // BANNER
-          Stack(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CommunityDetailPage(
+                communityName: c["name"],
+              ),
+            ),
+          );
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          decoration: BoxDecoration(
+            color: const Color(0xff1B1C1F),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(.05),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              /// 🔥 BANNER
               ClipRRect(
-                borderRadius:
-                const BorderRadius.vertical(
+                borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(24),
                 ),
-                child: SizedBox(
-                  height: 110,
-                  width: double.infinity,
-                  child: bannerUrl != null
-                      ? Image.network(
-                    bannerUrl,
-                    fit: BoxFit.cover,
-                  )
-                      : Container(
-                    decoration:
-                    BoxDecoration(
-                      gradient:
-                      LinearGradient(
-                        colors: [
-                          AppTheme.primary,
-                          Colors.deepPurple,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              Positioned(
-                right: 14,
-                top: 14,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration:
-                  BoxDecoration(
-                    color: Colors.black
-                        .withOpacity(.4),
-                    borderRadius:
-                    BorderRadius.circular(
-                      40,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.local_fire_department,
-                        size: 15,
-                        color:
-                        Colors.orange,
-                      ),
-                      const SizedBox(
-                        width: 4,
-                      ),
-                      Text(
-                        "Trending",
-                        style: TextStyle(
-                          color:
-                          Colors.grey
-                              .shade200,
-                          fontSize: 12,
-                          fontWeight:
-                          FontWeight
-                              .w600,
+                child: InkWell(
+                  onTap: () => _openFullImage(context, bannerUrl),
+                  child: SizedBox(
+                    height: 110,
+                    width: double.infinity,
+                    child: bannerUrl != null
+                        ? Image.network(
+                      bannerUrl,
+                      fit: BoxFit.cover,
+                    )
+                        : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppTheme.primary,
+                            Colors.deepPurple,
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ],
-          ),
 
-          Padding(
-            padding:
-            const EdgeInsets.all(18),
-            child: Row(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                // AVATAR
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.black,
-                      width: 4,
-                    ),
-                  ),
-                  child: CircleAvatar(
-                    radius: 32,
-                    backgroundColor: Colors.grey.shade800,
-
-                    backgroundImage:
-                    imageUrl != null &&
-                        imageUrl.isNotEmpty
-                        ? NetworkImage(imageUrl)
-                        : null,
-
-                    onBackgroundImageError:
-                        (_, __) {},
-
-                    child:
-                    imageUrl == null ||
-                        imageUrl.isEmpty
-                        ? const Icon(
-                      Icons.groups,
-                      color: Colors.white,
-                    )
-                        : null,
-                  ),
-                ),
-
-                const SizedBox(width: 16),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              c["name"] ??
-                                  "",
-                              style:
-                              const TextStyle(
-                                fontSize:
-                                18,
-                                fontWeight:
-                                FontWeight
-                                    .w800,
-                              ),
-                            ),
-                          ),
-
-                          const Icon(
-                            Icons.verified,
-                            color:
-                            Colors.blue,
-                            size: 18,
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 6,
-                      ),
-
-                      Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .people_alt_outlined,
-                            size: 16,
-                            color: Colors
-                                .grey
-                                .shade400,
-                          ),
-
-                          const SizedBox(
+              /// 🔥 CONTENT
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    /// 🔥 AVATAR (clickable)
+                    InkWell(
+                      borderRadius: BorderRadius.circular(50),
+                      onTap: () => _openFullImage(context, imageUrl),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.black,
                             width: 4,
                           ),
-
-                          Text(
-                            "$memberCount members",
-                            style:
-                            TextStyle(
-                              color: Colors
-                                  .grey
-                                  .shade400,
-                              fontWeight:
-                              FontWeight
-                                  .w500,
-                            ),
-                          ),
-
-                          const SizedBox(
-                            width: 12,
-                          ),
-
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration:
-                            const BoxDecoration(
-                              color:
-                              Colors.green,
-                              shape:
-                              BoxShape
-                                  .circle,
-                            ),
-                          ),
-
-                          const SizedBox(
-                            width: 5,
-                          ),
-
-                          Text(
-                            "Active",
-                            style:
-                            TextStyle(
-                              color: Colors
-                                  .grey
-                                  .shade400,
-                              fontSize:
-                              13,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(
-                        height: 12,
-                      ),
-
-                      Text(
-                        c["description"] ??
-                            "",
-                        maxLines: 3,
-                        overflow:
-                        TextOverflow
-                            .ellipsis,
-                        style: TextStyle(
-                          color: Colors
-                              .grey
-                              .shade300,
-                          height: 1.45,
+                        ),
+                        child: CircleAvatar(
+                          radius: 32,
+                          backgroundColor: Colors.grey.shade800,
+                          backgroundImage: imageUrl != null &&
+                              imageUrl.isNotEmpty
+                              ? NetworkImage(imageUrl)
+                              : null,
+                          child: imageUrl == null || imageUrl.isEmpty
+                              ? const Icon(
+                            Icons.groups,
+                            color: Colors.white,
+                          )
+                              : null,
                         ),
                       ),
+                    ),
 
-                      const SizedBox(
-                        height: 16,
-                      ),
+                    const SizedBox(width: 16),
 
-                      Row(
+                    /// 🔥 TEXT + BUTTON
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child:
-                            ElevatedButton(
-                              style:
-                              ElevatedButton.styleFrom(
-                                backgroundColor:
-                                isJoined
-                                    ? Colors
-                                    .white
-                                    .withOpacity(
-                                  .08,
-                                )
-                                    : AppTheme
-                                    .primary,
-                                foregroundColor:
-                                Colors
-                                    .white,
-                                elevation: 0,
-                                shape:
-                                RoundedRectangleBorder(
-                                  borderRadius:
-                                  BorderRadius.circular(
-                                    16,
+                          /// NAME
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  c["name"] ?? "",
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                padding:
-                                const EdgeInsets.symmetric(
-                                  vertical:
-                                  14,
+                              ),
+                              const Icon(
+                                Icons.verified,
+                                color: Colors.blue,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          /// MEMBERS
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.people_alt_outlined,
+                                size: 16,
+                                color: Colors.grey.shade400,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "$memberCount members",
+                                style: TextStyle(
+                                  color: Colors.grey.shade400,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              onPressed: () {
-                                if (isJoined) {
-                                  _leaveCommunity(
-                                    c["id"],
-                                  );
-                                } else {
-                                  _joinCommunity(
-                                    c["id"],
-                                  );
-                                }
-                              },
-                              child: Text(
-                                isJoined
-                                    ? "Joined"
-                                    : "Join Community",
-                                style:
-                                const TextStyle(
-                                  fontWeight:
-                                  FontWeight
-                                      .w700,
-                                ),
-                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          /// DESCRIPTION
+                          Text(
+                            c["description"] ?? "",
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.grey.shade300,
+                              height: 1.45,
                             ),
                           ),
+
+                          const SizedBox(height: 16),
+
+                          /// JOIN BUTTON
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isJoined
+                                        ? Colors.white.withOpacity(.08)
+                                        : AppTheme.primary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                      BorderRadius.circular(16),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                  ),
+                                  onPressed: () {
+                                    if (isJoined) {
+                                      _leaveCommunity(c["id"]);
+                                    } else {
+                                      _joinCommunity(c["id"]);
+                                    }
+                                  },
+                                  child: Text(
+                                    isJoined
+                                        ? "Joined"
+                                        : "Join Community",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
                         ],
-                      )
-                    ],
-                  ),
-                )
-              ],
-            ),
-          )
-        ],
+                      ),
+                    )
+                  ],
+                ),
+              )
+            ],
+          ),
+        ),
       ),
     );
   }
