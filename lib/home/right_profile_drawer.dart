@@ -6,7 +6,7 @@ import '../core/api_client.dart';
 
 import '../edit_profile_page.dart';
 import '../profile_page.dart';
-import '../saved_posts_page.dart';
+import '../post/saved_posts_page.dart';
 import '../settings_page.dart';
 import '../core/login_page.dart';
 import '../error/error_handler.dart';

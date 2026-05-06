@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mootable/personal_info_page.dart';
+import 'package:mootable/post/my_post_page.dart';
 import '../core/auth_service.dart';
 import '../core/api_client.dart';
 import 'error/error_handler.dart';
@@ -163,6 +164,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 },
                 icon: const Icon(Icons.info_outline),
                 label: const Text("Kişisel Bilgiler"),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MyPostsPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.article_outlined),
+                label: const Text("Paylaştıklarım"),
               ),
             ],
           ),

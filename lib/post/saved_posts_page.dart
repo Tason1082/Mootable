@@ -3,11 +3,11 @@ import 'package:mootable/post/post_card.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'core/api_client.dart';
+import '../core/api_client.dart';
 import 'package:dio/dio.dart';
 
-import 'core/api_service.dart';
-import 'home/home_page_functions.dart';
+import '../core/api_service.dart';
+import '../home/home_page_functions.dart';
 
 class SavedPostsPage extends StatefulWidget {
   const SavedPostsPage({super.key});
@@ -235,7 +235,6 @@ class SavedPostsPageState extends State<SavedPostsPage> {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
           child: Row(
             children: [
-              // 🔥 Avatar sadece varsa göster
               if (avatarUrl != null && avatarUrl.isNotEmpty)
                 CircleAvatar(
                   radius: 8,
@@ -245,7 +244,6 @@ class SavedPostsPageState extends State<SavedPostsPage> {
               if (avatarUrl != null && avatarUrl.isNotEmpty)
                 const SizedBox(width: 4),
 
-              // 🧾 Username
               Expanded(
                 child: Text(
                   username ?? "",
@@ -261,11 +259,15 @@ class SavedPostsPageState extends State<SavedPostsPage> {
           ),
         ),
 
-        // 📦 POST
+        // 📦 FIXED MEDIA AREA
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: mediaWidget,
+            child: Container(
+              width: double.infinity,
+              color: Colors.grey[100],
+              child: mediaWidget,
+            ),
           ),
         ),
       ],
@@ -299,6 +301,7 @@ class SavedPostsPageState extends State<SavedPostsPage> {
             crossAxisCount: 3,
             crossAxisSpacing: 4,
             mainAxisSpacing: 4,
+            childAspectRatio: 0.75, // 🔥 EKLE
           ),
           itemCount: posts.length + (hasMore ? 1 : 0),
           itemBuilder: (context, index) {
