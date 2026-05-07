@@ -104,9 +104,13 @@ class WebRTCVoiceService {
   Future<void> removePeer(String userId) async {
     if (_peers.containsKey(userId)) {
       await _peers[userId]?.close();
+
       _peers.remove(userId);
+      _peerStates.remove(userId);
+      _iceQueue.remove(userId);
     }
   }
+
   /// Offer handle
   Future<void> handleOffer(String userId, String sdp) async {
     final pc = _peers[userId]!;
@@ -160,11 +164,18 @@ class WebRTCVoiceService {
     for (var pc in _peers.values) {
       await pc.close();
     }
+
     _peers.clear();
+    _peerStates.clear();
+    _iceQueue.clear();
 
     if (_localStream != null) {
-      for (var track in _localStream!.getTracks()) track.stop();
+      for (var track in _localStream!.getTracks()) {
+        track.stop();
+      }
+
       await _localStream!.dispose();
+      _localStream = null;
     }
   }
 }

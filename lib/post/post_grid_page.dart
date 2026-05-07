@@ -380,19 +380,37 @@ class SavedPostsViewer extends StatefulWidget {
 }
 
 class _SavedPostsViewerState extends State<SavedPostsViewer> {
-  late List<Map<String, dynamic>> posts; // State listesi
+  late List<Map<String, dynamic>> posts;
   late final ScrollController _scrollController;
+
+  // 🔥 item key listesi
+  late List<GlobalKey> itemKeys;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
     posts = widget.posts;
-    // Tıklanan posttan başlat
+
+    itemKeys = List.generate(posts.length, (_) => GlobalKey());
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final offset = widget.initialIndex * 500.0;
-      _scrollController.jumpTo(offset);
+      _scrollToIndex(widget.initialIndex);
     });
+  }
+
+  void _scrollToIndex(int index) {
+    if (index < 0 || index >= itemKeys.length) return;
+
+    final context = itemKeys[index].currentContext;
+
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 300),
+        alignment: 0.1,
+      );
+    }
   }
 
   @override
@@ -409,17 +427,17 @@ class _SavedPostsViewerState extends State<SavedPostsViewer> {
       ),
       body: ListView.builder(
         controller: _scrollController,
-        itemCount: widget.posts.length,
+        itemCount: posts.length,
         itemBuilder: (context, index) {
-          final post = widget.posts[index];
+          final post = posts[index];
 
           return PostCard(
+            key: itemKeys[index], // 🔥 KRİTİK
             post: post,
             parentContext: context,
             onVote: (postId, vote) {
               toggleVote(this, postId, vote);
             },
-
             onJoinCommunity: (communityName, index) {},
           );
         },
@@ -427,7 +445,6 @@ class _SavedPostsViewerState extends State<SavedPostsViewer> {
     );
   }
 }
-
 class _VideoThumbnail extends StatefulWidget {
   final String videoUrl;
 

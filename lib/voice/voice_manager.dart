@@ -162,11 +162,18 @@ class VoiceManager {
   }
 
   Future<void> leave() async {
-    await signalR.disconnect();
+    try {
+      await signalR.disconnect();
+    } catch (_) {}
+
     await webrtc.dispose();
 
     members.value = [];
+
     connected.value = false;
     initialized = false;
+
+    roomId = null;
+    myUserId = null;
   }
 }

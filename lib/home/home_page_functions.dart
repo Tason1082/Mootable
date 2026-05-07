@@ -131,7 +131,6 @@ Future<void> toggleVote(dynamic state, int postId, int vote) async {
 
 /// =======================================================
 /// TOGGLE SAVE (API ONLY)
-/// =======================================================
 Future<void> toggleSave(
     dynamic state,
     int postId,
@@ -140,22 +139,38 @@ Future<void> toggleSave(
   final index = state.posts.indexWhere((p) => p["id"] == postId);
   if (index == -1) return;
 
+  // 🔥 optimistic update
   state.setState(() {
     state.posts[index]["is_saved"] = !currentlySaved;
   });
 
   try {
-    await ApiClient.dio.post(
+    final res = await ApiClient.dio.post(
       "/api/posts/save",
       data: {"postId": postId},
     );
-  } catch (_) {
+
+    // 🔥 ApiResponse kontrolü
+    if (res.data["success"] == false) {
+      throw Exception(res.data["message"]);
+    }
+
+    final saved = res.data["data"]["saved"] ?? false;
+
+    // 🔥 gerçek sonucu set et
+    state.setState(() {
+      state.posts[index]["is_saved"] = saved;
+    });
+
+  } catch (e) {
+    // 🔥 rollback
     state.setState(() {
       state.posts[index]["is_saved"] = currentlySaved;
     });
+
+    debugPrint("TOGGLE SAVE ERROR: $e");
   }
 }
-
 
 /// =======================================================
 /// NAVIGATION

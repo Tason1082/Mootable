@@ -3,6 +3,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../TimeAgo.dart';
 import '../comment/comment_page.dart';
+import '../core/api_client.dart';
+
+
 import '../core/api_service.dart';
 import '../my_community/community_detail_page.dart';
 import '../profile_page.dart';
@@ -52,7 +55,16 @@ class _PostCardState extends State<PostCard> {
     final postId = int.parse(widget.post["id"].toString());
 
     try {
-      final isSaved = await ApiService.isPostSaved(postId);
+      final res = await ApiClient.dio.get(
+        '/api/posts/save/is_saved/$postId',
+      );
+
+      // 🔥 ApiResponse kontrolü
+      if (res.data["success"] == false) {
+        throw Exception(res.data["message"]);
+      }
+
+      final isSaved = res.data["data"]["isSaved"] ?? false;
 
       if (mounted) {
         setState(() {
@@ -60,40 +72,62 @@ class _PostCardState extends State<PostCard> {
           _loadingSaved = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loadingSaved = false);
+    } catch (e) {
+      debugPrint("CHECK SAVE ERROR: $e");
+
+      if (mounted) {
+        setState(() => _loadingSaved = false);
+      }
     }
   }
-
   Future<void> _toggleSave() async {
     if (_loadingSaved) return;
 
     final postId = int.parse(widget.post["id"].toString());
+    final previous = _isSaved;
 
+    // ⚠️ optimistic UI (sadece loading için)
     setState(() {
-      _isSaved = !_isSaved;
       _loadingSaved = true;
     });
 
     try {
-      final saved = await ApiService.toggleSavePost(postId);
+      final res = await ApiClient.dio.post(
+        '/api/posts/save',
+        data: {"postId": postId},
+      );
 
+      if (res.data["success"] == false) {
+        throw Exception(res.data["message"]);
+      }
+
+      final saved = res.data["data"]["saved"] ?? false;
+
+      // 🔥 TEK GERÇEK SOURCE OF TRUTH
       if (mounted) {
         setState(() {
           _isSaved = saved;
-          _loadingSaved = false;
         });
       }
-    } catch (_) {
+
+    } catch (e) {
+      debugPrint("TOGGLE SAVE ERROR: $e");
+
+      // rollback
       if (mounted) {
         setState(() {
-          _isSaved = !_isSaved;
+          _isSaved = previous;
+        });
+      }
+
+    } finally {
+      if (mounted) {
+        setState(() {
           _loadingSaved = false;
         });
       }
     }
   }
-
   // ================= JOIN =================
   Future<void> _checkIfJoined() async {
     final communityId = widget.post["communityId"]?.toString();

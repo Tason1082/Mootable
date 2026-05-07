@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+
 import '../newchatpage.dart';
 import 'api_client.dart';
 
@@ -7,10 +9,17 @@ class ApiService {
 
   static Future<bool> isPostSaved(int postId) async {
     try {
-      final response = await ApiClient.dio.get("/api/posts/save/is_saved/$postId");
-      return response.data?["isSaved"] == true;
+      final response = await ApiClient.dio.get(
+        "/api/posts/save/is_saved/$postId",
+      );
+
+      if (response.data["success"] == false) {
+        throw Exception(response.data["message"]);
+      }
+
+      return response.data["data"]?["isSaved"] == true;
     } catch (e) {
-      print("ERROR isPostSaved: $e");
+      debugPrint("ERROR isPostSaved: $e");
       return false;
     }
   }
@@ -94,18 +103,26 @@ class ApiService {
         },
       );
 
-      final List data = response.data;
+      if (response.data["success"] == false) {
+        throw Exception(response.data["message"]);
+      }
 
-      return List<Map<String, dynamic>>.from(data)
-          .map((p) => {
-        ...p,
-        "votes_count": p["netScore"] ?? 0,
-        "user_vote": p["userVote"] ?? 0,
-        "created_at": p["createdAt"],
-      })
-          .toList();
+      final List data = response.data["data"] ?? [];
+
+      return data.map<Map<String, dynamic>>((p) {
+        final map = Map<String, dynamic>.from(p);
+
+        return {
+          ...map,
+          "votes_count": map["netScore"] ?? 0,
+          "user_vote": map["userVote"] ?? 0,
+          "created_at": map["createdAt"],
+          "comment_count": map["commentCount"] ?? 0,
+          "is_saved": true,
+        };
+      }).toList();
     } catch (e) {
-      print("ERROR getSavedPosts: $e");
+      debugPrint("ERROR getSavedPosts: $e");
       return [];
     }
   }
@@ -115,9 +132,14 @@ class ApiService {
         "/api/posts/save",
         data: {"postId": postId},
       );
-      return response.data?["saved"] == true;
+
+      if (response.data["success"] == false) {
+        throw Exception(response.data["message"]);
+      }
+
+      return response.data["data"]?["saved"] == true;
     } catch (e) {
-      print("ERROR toggleSavePost: $e");
+      debugPrint("ERROR toggleSavePost: $e");
       return false;
     }
   }
