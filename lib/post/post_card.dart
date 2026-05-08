@@ -10,6 +10,7 @@ import '../core/api_service.dart';
 import '../my_community/community_detail_page.dart';
 import '../profile_page.dart';
 import '../quote_post_page.dart';
+import 'editpost_page.dart';
 import 'full_screen_image.dart';
 import 'inline_video_player.dart';
 
@@ -19,13 +20,16 @@ class PostCard extends StatefulWidget {
 
   final void Function(int postId, int vote)? onVote;
   final void Function(String communityName, int index)? onJoinCommunity;
-
+  final bool isMyPost;
+  final VoidCallback? onDeleted;
   const PostCard({
     super.key,
     required this.post,
     required this.parentContext,
     this.onVote,
     this.onJoinCommunity,
+    this.isMyPost = false,
+    this.onDeleted,
   });
 
   @override
@@ -251,7 +255,7 @@ class _PostCardState extends State<PostCard> {
   }
 
   // ================= BUILD =================
-  @override
+
   @override
   Widget build(BuildContext context) {
     final post = widget.post;
@@ -271,22 +275,18 @@ class _PostCardState extends State<PostCard> {
           // ================= HEADER =================
           ListTile(
             leading: CircleAvatar(
-              backgroundImage:
-              profileImage != null && profileImage
-                  .toString()
-                  .isNotEmpty
+              backgroundImage: profileImage != null &&
+                  profileImage.toString().isNotEmpty
                   ? NetworkImage(profileImage)
                   : null,
-              child: profileImage == null || profileImage
-                  .toString()
-                  .isEmpty
+              child: profileImage == null ||
+                  profileImage.toString().isEmpty
                   ? const Icon(Icons.person)
                   : null,
             ),
 
             title: Row(
               children: [
-                // 👇 USERNAME CLICK → PROFILE
                 GestureDetector(
                   onTap: () {
                     Navigator.push(
@@ -300,13 +300,14 @@ class _PostCardState extends State<PostCard> {
                   },
                   child: Text(
                     post["username"] ?? "user",
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
 
                 const SizedBox(width: 6),
 
-                // 👇 COMMUNITY CLICK → COMMUNITY PAGE
                 GestureDetector(
                   onTap: () {
                     if (post["community"] == null) return;
@@ -322,10 +323,7 @@ class _PostCardState extends State<PostCard> {
                   },
                   child: Text(
                     post["community"] ?? "",
-                    style: TextStyle(
-                      color: colors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(color: colors.primary),
                   ),
                 ),
               ],
@@ -373,7 +371,8 @@ class _PostCardState extends State<PostCard> {
                       ? colors.primary
                       : colors.onSurfaceVariant,
                 ),
-                onPressed: () => widget.onVote?.call(postId, 1),
+                onPressed: () =>
+                    widget.onVote?.call(postId, 1),
               ),
 
               Text("${post["votes_count"] ?? 0}"),
@@ -385,7 +384,8 @@ class _PostCardState extends State<PostCard> {
                       ? colors.error
                       : colors.onSurfaceVariant,
                 ),
-                onPressed: () => widget.onVote?.call(postId, -1),
+                onPressed: () =>
+                    widget.onVote?.call(postId, -1),
               ),
 
               IconButton(
@@ -394,7 +394,8 @@ class _PostCardState extends State<PostCard> {
                   Navigator.push(
                     widget.parentContext,
                     MaterialPageRoute(
-                      builder: (_) => CommentPage(postId: postId),
+                      builder: (_) =>
+                          CommentPage(postId: postId),
                     ),
                   );
                 },
@@ -410,17 +411,90 @@ class _PostCardState extends State<PostCard> {
                   Navigator.push(
                     widget.parentContext,
                     MaterialPageRoute(
-                      builder: (_) => QuotePostPage(post: post),
+                      builder: (_) =>
+                          QuotePostPage(post: post),
                     ),
                   );
                 },
               ),
 
-              IconButton(
-                onPressed: _toggleSave,
-                icon: Icon(
-                  _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                ),
+              // ================= SAVE + 3 DOT =================
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: _toggleSave,
+                    icon: Icon(
+                      _isSaved
+                          ? Icons.bookmark
+                          : Icons.bookmark_border,
+                    ),
+                  ),
+
+                  if (widget.isMyPost)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      onSelected: (value) async {
+                        if (value == "edit") {
+                          // EDIT PAGE
+                        }
+
+                        if (value == "delete") {
+                          final confirm =
+                          await showDialog<bool>(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text("Post sil"),
+                              content:
+                              const Text("Emin misin?"),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(
+                                          context, false),
+                                  child: const Text("İptal"),
+                                ),
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.pop(
+                                          context, true),
+                                  child: const Text("Sil"),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (confirm != true) return;
+
+                          final success =
+                          await ApiService.deletePost(
+                              post["id"]);
+
+                          if (success && mounted) {
+                            widget.onDeleted?.call();
+                          }
+                        }
+                        if (value == "edit") {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => EditPostPage(post: post),
+                            ),
+                          );
+                        }
+                      },
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(
+                          value: "edit",
+                          child: Text("Düzenle"),
+                        ),
+                        PopupMenuItem(
+                          value: "delete",
+                          child: Text("Sil"),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ],
           ),

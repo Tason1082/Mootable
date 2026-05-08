@@ -6,7 +6,25 @@ import 'api_client.dart';
 class ApiService {
 
   // ================= POSTS SAVE =================
+  // ================= DELETE POST =================
 
+  static Future<bool> deletePost(int postId) async {
+    try {
+      final response = await ApiClient.dio.delete(
+        "/api/posts/$postId",
+      );
+
+      if (response.data["success"] == false) {
+        throw Exception(response.data["message"]);
+      }
+
+      return true;
+
+    } catch (e) {
+      debugPrint("ERROR deletePost: $e");
+      return false;
+    }
+  }
   static Future<bool> isPostSaved(int postId) async {
     try {
       final response = await ApiClient.dio.get(

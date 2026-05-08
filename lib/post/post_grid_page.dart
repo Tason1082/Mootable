@@ -341,7 +341,7 @@ class _PostsGridPageState extends State<PostsGridPage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => SavedPostsViewer(
+                    builder: (_) => PostsGridViewer(
                       posts: posts,
                       initialIndex: index,
                     ),
@@ -365,21 +365,21 @@ class _PostsGridPageState extends State<PostsGridPage> {
     );
   }
 }
-class SavedPostsViewer extends StatefulWidget {
+class PostsGridViewer extends StatefulWidget {
   final List<Map<String, dynamic>> posts;
   final int initialIndex;
 
-  const SavedPostsViewer({
+  const PostsGridViewer({
     super.key,
     required this.posts,
     required this.initialIndex,
   });
 
   @override
-  State<SavedPostsViewer> createState() => _SavedPostsViewerState();
+  State<PostsGridViewer> createState() => _SavedPostsViewerState();
 }
 
-class _SavedPostsViewerState extends State<SavedPostsViewer> {
+class _SavedPostsViewerState extends State<PostsGridViewer> {
   late List<Map<String, dynamic>> posts;
   late final ScrollController _scrollController;
 
@@ -432,12 +432,21 @@ class _SavedPostsViewerState extends State<SavedPostsViewer> {
           final post = posts[index];
 
           return PostCard(
-            key: itemKeys[index], // 🔥 KRİTİK
+            key: itemKeys[index],
             post: post,
             parentContext: context,
+            isMyPost: true,
+
+            onDeleted: () {
+              setState(() {
+                posts.removeAt(index);
+              });
+            },
+
             onVote: (postId, vote) {
               toggleVote(this, postId, vote);
             },
+
             onJoinCommunity: (communityName, index) {},
           );
         },
