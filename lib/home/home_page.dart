@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/api_navigation.dart';
+import '../core/api_service.dart';
 import '../error/error_handler.dart';
 
 
@@ -26,15 +28,15 @@ class HomePage extends StatefulWidget {
 class HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
-
+  final Map<int, GlobalKey> postKeys = {};
   final user = Supabase.instance.client.auth.currentUser;
   String? username;
   String? bio;
   String? profileImageUrl;
-
+  final Set<int> highlightedPosts = {};
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int selectedIndex = 0;
-
+  static HomePageState? instance;
   int limit = 5;
   int offset = 0;
   bool isLoadingMore = false;
@@ -43,10 +45,15 @@ class HomePageState extends State<HomePage> {
   late final ScrollController _scrollController;
 
   @override
+
   void initState() {
     super.initState();
+
     fetchPosts(this);
+
     _fetchUserProfile();
+
+    instance = this;
 
     _scrollController = ScrollController()
       ..addListener(() {
@@ -55,8 +62,56 @@ class HomePageState extends State<HomePage> {
           fetchPosts(this, loadMore: true);
         }
       });
+
+
   }
 
+  Future<void> openPost(int postId) async {
+    // önce post listede var mı kontrol et
+    final exists = posts.any((p) => p["id"] == postId);
+
+    // yoksa fetch et
+    if (!exists) {
+      final post = await ApiService.getPostById(postId);
+
+      if (post != null) {
+        setState(() {
+          posts.insert(0, post);
+        });
+
+        await Future.delayed(
+          const Duration(milliseconds: 300),
+        );
+      }
+    }
+
+    final key = postKeys[postId];
+
+    if (key?.currentContext == null) {
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      key!.currentContext!,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+
+    _highlightPost(postId);
+  }
+  void _highlightPost(int postId) {
+    setState(() {
+      highlightedPosts.add(postId);
+    });
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+
+      setState(() {
+        highlightedPosts.remove(postId);
+      });
+    });
+  }
   @override
   void dispose() {
     _scrollController.dispose();
@@ -144,12 +199,22 @@ class HomePageState extends State<HomePage> {
             }
             final post = posts[index];
 
-            return PostCard(
-              post: post,
-              parentContext: context,
-              onVote: (postId, vote) => toggleVote(this,postId, vote),
-              onJoinCommunity: (communityName, index) =>
-                  joinCommunity(this, communityName, index),
+            return Container(
+              key: postKeys[post["id"]] ??= GlobalKey(),
+
+              child: PostCard(
+                post: post,
+                parentContext: context,
+
+                onVote: (postId, vote) =>
+                    toggleVote(this, postId, vote),
+
+                onJoinCommunity: (communityName, index) =>
+                    joinCommunity(this, communityName, index),
+
+                highlight:
+                highlightedPosts.contains(post["id"]),
+              ),
             );
           },
         ),

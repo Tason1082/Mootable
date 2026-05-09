@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/signalr_client.dart';
@@ -14,7 +15,7 @@ class SignalRService {
     _connection = HubConnectionBuilder()
 
         .withUrl(
-      "http://192.168.0.31:5004/hubs/chat",
+      "http://10.0.2.2:5004/hubs/chat",
       options: HttpConnectionOptions(
         accessTokenFactory: () async => token,
       ),
@@ -36,11 +37,18 @@ class SignalRService {
   }
 
   static Future<void> sendMessage(
-      int conversationId, String content) async {
-    if (_connection?.state == HubConnectionState.Connected) {
+      Map<String, dynamic> payload) async {
+
+    if (_connection?.state ==
+        HubConnectionState.Connected) {
+
+      debugPrint(
+        "SIGNALR SEND => $payload",
+      );
+
       await _connection!.invoke(
         "SendMessage",
-        args: [conversationId, content],
+        args: [payload],
       );
     }
   }

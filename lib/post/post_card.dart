@@ -1,13 +1,17 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../TimeAgo.dart';
+import '../chat/conversation_service.dart';
 import '../comment/comment_page.dart';
 import '../core/api_client.dart';
 
 
 import '../core/api_service.dart';
 import '../my_community/community_detail_page.dart';
+import '../newchatpage.dart';
 import '../profile_page.dart';
 import '../quote_post_page.dart';
 import 'editpost_page.dart';
@@ -18,10 +22,14 @@ class PostCard extends StatefulWidget {
   final Map<String, dynamic> post;
   final BuildContext parentContext;
 
+
   final void Function(int postId, int vote)? onVote;
   final void Function(String communityName, int index)? onJoinCommunity;
   final bool isMyPost;
+  final bool highlighted;
   final VoidCallback? onDeleted;
+  final GlobalKey? postKey;
+  final bool highlight;
   const PostCard({
     super.key,
     required this.post,
@@ -29,7 +37,10 @@ class PostCard extends StatefulWidget {
     this.onVote,
     this.onJoinCommunity,
     this.isMyPost = false,
+    this.highlighted = false,
     this.onDeleted,
+    this.postKey,
+    this.highlight = false,
   });
 
   @override
@@ -39,7 +50,9 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   bool _isSaved = false;
   bool _loadingSaved = true;
-
+  List<UserDto> _users = [];
+  List<UserDto> _filteredUsers = [];
+  bool _loadingUsers = false;
   bool _isJoined = false;
   bool _loadingJoin = true;
 
@@ -53,6 +66,87 @@ class _PostCardState extends State<PostCard> {
     _checkIfSaved();
     _checkIfJoined();
   }
+  Future<void> _loadUsers() async {
+    setState(() => _loadingUsers = true);
+
+    final users = await ApiService.getUsers();
+
+    if (!mounted) return;
+
+    setState(() {
+      _users = users;
+      _filteredUsers = users;
+      _loadingUsers = false;
+    });
+  }
+
+  String extractStoragePath(String url) {
+    final uri = Uri.parse(url);
+
+    final path = uri.path;
+
+    final parts = path.split('/posts/');
+
+    if (parts.length > 1) {
+      return parts[1];
+    }
+
+    return url;
+  }
+  Future<void> _sendPostToUser(UserDto user) async {
+    try {
+      final conversationId = await ConversationService.create(
+        userIds: [user.id],
+      );
+
+      final medias = widget.post["medias"] as List<dynamic>? ?? [];
+
+      final firstMedia = medias.isNotEmpty ? medias.first : null;
+
+      final mediaUrl = firstMedia != null ? firstMedia["url"] : null;
+      final mediaType = firstMedia != null ? firstMedia["type"] : null;
+
+      final payload = {
+        "conversationId": conversationId,
+        "content": widget.post["content"],
+        "receiverId": user.id,
+        "medias": firstMedia != null
+            ? [
+          {
+            "url": extractStoragePath(firstMedia["url"]),
+            "type": firstMedia["type"],
+          }
+        ]
+            : [],
+      };
+
+
+
+      await ConversationService.sendMessage(
+        conversationId: conversationId,
+        content: payload["content"],
+        receiverId: user.id,
+        medias: List<Map<String, dynamic>>.from(payload["medias"]),
+      );
+
+      if (!mounted) return;
+
+      Navigator.pop(context);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("${user.username} kullanıcısına gönderildi"),
+        ),
+      );
+    } catch (e) {
+      debugPrint("SEND POST ERROR: $e");
+    }
+  }
+
+
+
+
+
 
   // ================= SAVE =================
   Future<void> _checkIfSaved() async {
@@ -267,10 +361,19 @@ class _PostCardState extends State<PostCard> {
     final profileImage = post["profileImageUrl"];
 
     return Container(
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        key: widget.postKey,
+        color: Colors.white,
+
+        child: AnimatedContainer(
+        duration: const Duration(milliseconds: 600),
+
+    color: widget.highlight
+    ? Colors.yellow.withOpacity(0.25)
+        : Colors.white,
+
+    child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
 
           // ================= HEADER =================
           ListTile(
@@ -402,21 +505,134 @@ class _PostCardState extends State<PostCard> {
               ),
 
               Text("${post["commentCount"] ?? 0}"),
-
-              const Spacer(),
-
               IconButton(
-                icon: const Icon(Icons.repeat),
-                onPressed: () {
-                  Navigator.push(
-                    widget.parentContext,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          QuotePostPage(post: post),
+                icon: const Icon(Icons.send),
+                onPressed: () async {
+                  await _loadUsers();
+
+                  if (!mounted) return;
+
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
                     ),
+                    builder: (_) {
+                      return StatefulBuilder(
+                        builder: (context, setModalState) {
+                          return SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.5,
+                            child: Column(
+                              children: [
+
+                                const SizedBox(height: 12),
+
+                                Container(
+                                  width: 40,
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade400,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      "Gönder",
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // SEARCH
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  child: TextField(
+                                    onChanged: (value) {
+                                      setModalState(() {
+                                        _filteredUsers = _users.where((u) {
+                                          return u.username
+                                              .toLowerCase()
+                                              .contains(value.toLowerCase());
+                                        }).toList();
+                                      });
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: "Kullanıcı ara...",
+                                      prefixIcon: const Icon(Icons.search),
+                                      filled: true,
+                                      fillColor: Colors.grey.shade100,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 16),
+
+                                Expanded(
+                                  child: _loadingUsers
+                                      ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                      : ListView.builder(
+                                    itemCount: _filteredUsers.length,
+                                    itemBuilder: (_, index) {
+                                      final user = _filteredUsers[index];
+
+                                      return ListTile(
+                                        leading: CircleAvatar(
+                                          backgroundImage:
+                                          user.profileImageUrl != null
+                                              ? NetworkImage(
+                                            user.profileImageUrl!,
+                                          )
+                                              : null,
+                                          child: user.profileImageUrl == null
+                                              ? const Icon(Icons.person)
+                                              : null,
+                                        ),
+
+                                        title: Text(user.username),
+
+                                        trailing: ElevatedButton(
+                                          onPressed: () {
+                                            _sendPostToUser(user);
+                                          },
+                                          child: const Text("Gönder"),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
                   );
                 },
               ),
+              const Spacer(),
+
+
 
               // ================= SAVE + 3 DOT =================
               Row(
@@ -502,5 +718,6 @@ class _PostCardState extends State<PostCard> {
           const Divider(),
         ],
       ),
+        ),
     );
   }}

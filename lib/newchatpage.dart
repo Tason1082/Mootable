@@ -213,16 +213,19 @@ class _NewChatPageState extends State<NewChatPage> {
 class UserDto {
   final String id;
   final String username;
+  final String? profileImageUrl;
 
   UserDto({
     required this.id,
     required this.username,
+    this.profileImageUrl,
   });
 
   factory UserDto.fromJson(Map<String, dynamic> json) {
     return UserDto(
       id: json["id"]?.toString() ?? "",
       username: json["username"] ?? "Unknown",
+      profileImageUrl: json["profileImageUrl"],
     );
   }
 }

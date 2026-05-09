@@ -1,6 +1,7 @@
 import '../core/api_client.dart';
 import 'conversation_list_model.dart';
 import 'conversation_model.dart';
+import 'message_model.dart';
 
 
 class ConversationService {
@@ -15,7 +16,20 @@ class ConversationService {
         .map((e) => ConversationListModel.fromJson(e))
         .toList();
   }
+  static Future<List<MessageModel>> getHistory(
+      int conversationId,
+      ) async {
 
+    final res = await ApiClient.dio.get(
+      "/api/messages/$conversationId",
+    );
+
+    final data = res.data as List;
+
+    return data
+        .map((e) => MessageModel.fromJson(e))
+        .toList();
+  }
   // CREATE
   static Future<int> create({
     String? title,
@@ -40,17 +54,20 @@ class ConversationService {
 
   // SEND
   // SEND
-  static Future<void> sendMessage(
-      int conversationId,
-      String text, {
-        String? receiverId,
-      }) async {
+  static Future<void> sendMessage({
+    required int conversationId,
+    required String content,
+    String? receiverId,
+    List<Map<String, dynamic>> medias = const [],
+  }) async {
+
     await ApiClient.dio.post(
       "/api/messages",
       data: {
         "conversationId": conversationId,
-        "receiverId": receiverId, // 🔥 EKLENDİ
-        "content": text,
+        "receiverId": receiverId,
+        "content": content,
+        "medias": medias,
       },
     );
   }

@@ -25,6 +25,7 @@ class ApiService {
       return false;
     }
   }
+
   static Future<bool> isPostSaved(int postId) async {
     try {
       final response = await ApiClient.dio.get(
@@ -63,6 +64,7 @@ class ApiService {
       return null;
     }
   }
+
   static Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     try {
       final response = await ApiClient.dio.get(
@@ -161,7 +163,32 @@ class ApiService {
       return false;
     }
   }
+  static Future<Map<String, dynamic>?> getPostById(
+      int postId,
+      ) async {
+    try {
+      final response = await ApiClient.dio.get(
+        "/api/posts/$postId",
+      );
 
+      final body = response.data;
+
+      if (body == null) {
+        return null;
+      }
+
+      final data = body["data"];
+
+      if (data == null) {
+        return null;
+      }
+
+      return Map<String, dynamic>.from(data);
+    } catch (e) {
+      debugPrint("GET POST ERROR => $e");
+      return null;
+    }
+  }
   // ================= COMMUNITIES =================
 
   static Future<bool> isJoined(String communityId) async {
