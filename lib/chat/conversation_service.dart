@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+
 import '../core/api_client.dart';
 import 'conversation_list_model.dart';
 import 'conversation_model.dart';
@@ -19,10 +21,11 @@ class ConversationService {
   static Future<List<MessageModel>> getHistory(
       int conversationId,
       ) async {
-
     final res = await ApiClient.dio.get(
       "/api/messages/$conversationId",
     );
+
+    debugPrint(res.data.toString());
 
     final data = res.data as List;
 
@@ -58,6 +61,7 @@ class ConversationService {
     required int conversationId,
     required String content,
     String? receiverId,
+    int? postId,
     List<Map<String, dynamic>> medias = const [],
   }) async {
 
@@ -67,6 +71,7 @@ class ConversationService {
         "conversationId": conversationId,
         "receiverId": receiverId,
         "content": content,
+        "postId": postId, // ✅ BURASI DOĞRU
         "medias": medias,
       },
     );

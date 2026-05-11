@@ -95,39 +95,35 @@ class _PostCardState extends State<PostCard> {
   }
   Future<void> _sendPostToUser(UserDto user) async {
     try {
+      debugPrint("=== SEND POST START ===");
+      debugPrint("USER => ${user.id}");
+      debugPrint("POST RAW => ${widget.post}");
+
       final conversationId = await ConversationService.create(
         userIds: [user.id],
       );
 
-      final medias = widget.post["medias"] as List<dynamic>? ?? [];
+      debugPrint("CONVERSATION ID => $conversationId");
 
-      final firstMedia = medias.isNotEmpty ? medias.first : null;
+      final rawPostId = widget.post["id"] ?? widget.post["data"]?["id"];
 
-      final mediaUrl = firstMedia != null ? firstMedia["url"] : null;
-      final mediaType = firstMedia != null ? firstMedia["type"] : null;
+      debugPrint("RAW POST ID => $rawPostId");
 
-      final payload = {
-        "conversationId": conversationId,
-        "content": widget.post["content"],
-        "receiverId": user.id,
-        "medias": firstMedia != null
-            ? [
-          {
-            "url": extractStoragePath(firstMedia["url"]),
-            "type": firstMedia["type"],
-          }
-        ]
-            : [],
-      };
+      final safePostId = int.tryParse(widget.post["id"].toString());
 
-
+      if (safePostId == null) {
+        debugPrint("❌ POST ID STILL NULL");
+        return;
+      }
 
       await ConversationService.sendMessage(
         conversationId: conversationId,
-        content: payload["content"],
         receiverId: user.id,
-        medias: List<Map<String, dynamic>>.from(payload["medias"]),
+        postId: safePostId,
+        content: "",
       );
+
+      debugPrint("MESSAGE SENT SUCCESS");
 
       if (!mounted) return;
 
@@ -138,12 +134,12 @@ class _PostCardState extends State<PostCard> {
           content: Text("${user.username} kullanıcısına gönderildi"),
         ),
       );
+
+      debugPrint("=== SEND POST END ===");
     } catch (e) {
-      debugPrint("SEND POST ERROR: $e");
+      debugPrint("❌ SEND POST ERROR: $e");
     }
   }
-
-
 
 
 

@@ -19,6 +19,9 @@ import 'right_profile_drawer.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class HomePage extends StatefulWidget {
+  static final GlobalKey<HomePageState> globalKey =
+  GlobalKey<HomePageState>();
+
   const HomePage({super.key});
 
   @override
@@ -32,15 +35,17 @@ class HomePageState extends State<HomePage> {
   final user = Supabase.instance.client.auth.currentUser;
   String? username;
   String? bio;
+  static HomePageState? instance;
   String? profileImageUrl;
   final Set<int> highlightedPosts = {};
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int selectedIndex = 0;
-  static HomePageState? instance;
+
   int limit = 5;
   int offset = 0;
   bool isLoadingMore = false;
   bool hasMore = true;
+  int? _pendingPostId;
 
   late final ScrollController _scrollController;
 
@@ -62,38 +67,33 @@ class HomePageState extends State<HomePage> {
           fetchPosts(this, loadMore: true);
         }
       });
-
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pendingPostId != null) {
+        openPost(_pendingPostId!);
+        _pendingPostId = null;
+      }
+    });
 
   }
 
   Future<void> openPost(int postId) async {
-    // önce post listede var mı kontrol et
-    final exists = posts.any((p) => p["id"] == postId);
+    final index = posts.indexWhere((p) => p["id"] == postId);
 
-    // yoksa fetch et
-    if (!exists) {
-      final post = await ApiService.getPostById(postId);
-
-      if (post != null) {
-        setState(() {
-          posts.insert(0, post);
-        });
-
-        await Future.delayed(
-          const Duration(milliseconds: 300),
-        );
-      }
-    }
+    // post yoksa hiçbir şey yapma
+    if (index == -1) return;
 
     final key = postKeys[postId];
 
+    // key yoksa bile index ile scroll yap
     if (key?.currentContext == null) {
+      await _scrollToIndex(index);
+      _highlightPost(postId);
       return;
     }
 
     await Scrollable.ensureVisible(
       key!.currentContext!,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
     );
 
@@ -117,7 +117,15 @@ class HomePageState extends State<HomePage> {
     _scrollController.dispose();
     super.dispose();
   }
+  Future<void> _scrollToIndex(int index) async {
+    await Future.delayed(const Duration(milliseconds: 100));
 
+    _scrollController.animateTo(
+      index * 120, // approx item height
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
 

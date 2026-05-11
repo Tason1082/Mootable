@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../TimeAgo.dart';
 import '../core/api_navigation.dart';
 import '../core/api_service.dart';
 
@@ -114,26 +115,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     setState(() {});
   }
   Future<void> _loadInitialMessages() async {
-
-    final msgs =
-    await ConversationService.getHistory(
+    final msgs = await ConversationService.getHistory(
       widget.conversationId,
-    );
-
-    await Future.wait(
-      msgs.map((msg) async {
-
-        final user =
-        await ApiService.getUserById(
-          msg.senderId,
-        );
-
-        msg.senderUsername =
-            user?["username"] ?? "Unknown";
-
-        msg.senderProfileImage =
-        user?["profileImageUrl"];
-      }),
     );
 
     if (!mounted) return;
@@ -309,21 +292,27 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                           children: [
 
 // USERNAME
-                            if (!isMe)
-                              Text(
-                                msg.senderUsername ??
-                                    "Unknown",
+                            if (!isMe) ...[
+                              Row(
+                                children: [
 
-                                style:
-                                const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight:
-                                  FontWeight
-                                      .w600,
-                                  color:
-                                  Colors.black87,
-                                ),
+                                  // AVATAR
+
+
+                                  // USERNAME
+                                  Text(
+                                    msg.senderUsername ?? "Unknown",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
                               ),
+
+                              const SizedBox(height: 6),
+                            ],
 
                             const SizedBox(
                               height: 2,
@@ -333,98 +322,137 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                             Builder(
                               builder: (_) {
 
-                                dynamic decoded;
-                                debugPrint("RAW CONTENT => ${msg.content}");
-                                try {
-                                  decoded = jsonDecode(msg.content);
-                                  debugPrint("DECODED => $decoded");
-                                } catch (e) {
-                                  debugPrint("JSON ERROR => $e");
-                                  decoded = null;
-                                }
-
                                 // =========================
                                 // POST SHARE
                                 // =========================
-                                if (decoded is Map &&
-                                    decoded["type"] == "post_share") {
-
-                                  final postId = decoded["postId"];
-
-                                  final content =
-                                      decoded["content"] ?? "";
-
-                                  final medias =
-                                      decoded["medias"]
-                                      as List<dynamic>? ?? [];
+                                if (msg.post != null) {
+                                  final post = msg.post!;
 
                                   String? mediaUrl;
 
-                                  if (medias.isNotEmpty) {
-                                    mediaUrl = medias.first["url"];
+                                  if (post.medias.isNotEmpty) {
+                                    mediaUrl = post.medias.first.url;
                                   }
 
                                   return GestureDetector(
-                                    onTap: () {
-
+                                    onTap: () async {
                                       Navigator.popUntil(context, (r) => r.isFirst);
 
-                                      Future.delayed(
+                                      await Future.delayed(
                                         const Duration(milliseconds: 500),
-                                            () {
-                                          if (!context.mounted) return;
-
-                                          HomePageState.instance?.openPost(postId);
-                                        },
                                       );
-                                    },
 
+                                      if (!mounted) return;
+
+                                      await HomePageState.instance?.openPost(post.id);
+                                    },
                                     child: Container(
                                       width: 250,
-
-                                      margin:
-                                      const EdgeInsets.only(top: 4),
-
+                                      margin: const EdgeInsets.only(top: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
-
-                                        borderRadius:
-                                        BorderRadius.circular(12),
-
-                                        border: Border.all(
-                                          color: Colors.grey.shade300,
-                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: Colors.grey.shade300),
                                       ),
-
                                       child: Column(
-                                        crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
 
-                                          if (mediaUrl != null)
-                                            ClipRRect(
-                                              borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(12),
-                                              ),
+                                          // =========================
+                                          // HEADER (PROFILE + USERNAME + TIME)
+                                          // =========================
+                                          Padding(
+                                            padding: const EdgeInsets.all(10),
+                                            child: Row(
+                                              children: [
 
-                                              child: Image.network(
-                                                mediaUrl,
-                                                height: 180,
-                                                width: double.infinity,
-                                                fit: BoxFit.cover,
-                                              ),
+                                                // PROFILE IMAGE
+                                                CircleAvatar(
+                                                  radius: 16,
+                                                  backgroundImage: post.profileImageUrl != null
+                                                      ? NetworkImage(post.profileImageUrl!)
+                                                      : null,
+                                                  backgroundColor: Colors.grey.shade300,
+                                                  child: post.profileImageUrl == null
+                                                      ? const Icon(Icons.person, size: 18)
+                                                      : null,
+                                                ),
+
+                                                const SizedBox(width: 8),
+
+                                                // USERNAME + TIME
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+
+                                                      Text(
+                                                        post.username.isNotEmpty
+                                                            ? post.username
+                                                            : "Unknown",
+                                                        style: const TextStyle(
+                                                          fontSize: 13,
+                                                          fontWeight: FontWeight.w600,
+                                                        ),
+                                                      ),
+
+                                                      const SizedBox(height: 2),
+
+                                                      Text(
+                                                        TimeAgo.format(context, post.createdAt),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: Colors.grey,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+
+                                          // =========================
+                                          // IMAGE (TOP)
+                                          // =========================
+                                          if (post.medias.isNotEmpty)
+                                            Builder(
+                                              builder: (_) {
+                                                final media = post.medias.first;
+
+                                                if (media.type == "image") {
+                                                  return Image.network(
+                                                    media.url,
+                                                    height: 180,
+                                                    width: double.infinity,
+                                                    fit: BoxFit.cover,
+                                                  );
+                                                }
+
+                                                if (media.type == "video") {
+                                                  return SizedBox(
+                                                    height: 180,
+                                                    width: double.infinity,
+                                                    child: InlineVideoPlayer(
+                                                      url: media.url,
+                                                    ),
+                                                  );
+                                                }
+
+                                                return const SizedBox();
+                                              },
                                             ),
 
+                                          // =========================
+                                          // CONTENT
+                                          // =========================
                                           Padding(
-                                            padding:
-                                            const EdgeInsets.all(12),
-
+                                            padding: const EdgeInsets.all(12),
                                             child: Text(
-                                              content,
-                                              style:
-                                              const TextStyle(fontSize: 15),
+                                              post.content,
+                                              maxLines: 3,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(fontSize: 14),
                                             ),
                                           ),
                                         ],
@@ -461,10 +489,24 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                                               borderRadius:
                                               BorderRadius.circular(12),
 
-                                              child: Image.network(
-                                                url,
-                                                width: 220,
-                                                fit: BoxFit.cover,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          FullScreenImagePage(
+                                                            imageUrl: url,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+
+                                                child: Image.network(
+                                                  url,
+                                                  width: 220,
+                                                  fit: BoxFit.cover,
+                                                ),
                                               ),
                                             ),
                                           );
