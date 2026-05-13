@@ -22,7 +22,6 @@ class _ChatPageState extends State<ChatPage> {
     super.initState();
     _load();
   }
-
   Future<void> _load() async {
     try {
       final list = await ConversationService.getAll();
@@ -36,12 +35,17 @@ class _ChatPageState extends State<ChatPage> {
         }),
       );
 
+      if (!mounted) return;
+
       setState(() {
         conversations = list;
         isLoading = false;
       });
     } catch (e) {
       print("LOAD ERROR: $e");
+
+      if (!mounted) return;
+
       setState(() {
         isLoading = false;
       });

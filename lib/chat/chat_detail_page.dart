@@ -335,16 +335,15 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                                   }
 
                                   return GestureDetector(
-                                    onTap: () async {
-                                      Navigator.popUntil(context, (r) => r.isFirst);
-
-                                      await Future.delayed(
-                                        const Duration(milliseconds: 500),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => HomePage(
+                                            postId: post.id, // buradan gönderiyorsun
+                                          ),
+                                        ),
                                       );
-
-                                      if (!mounted) return;
-
-                                      await HomePageState.instance?.openPost(post.id);
                                     },
                                     child: Container(
                                       width: 250,

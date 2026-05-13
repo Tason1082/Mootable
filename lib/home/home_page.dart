@@ -1,10 +1,9 @@
-import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/api_navigation.dart';
-import '../core/api_service.dart';
+
 import '../error/error_handler.dart';
 
 
@@ -22,12 +21,16 @@ class HomePage extends StatefulWidget {
   static final GlobalKey<HomePageState> globalKey =
   GlobalKey<HomePageState>();
 
-  const HomePage({super.key});
+  final int? postId;
+
+  const HomePage({
+    super.key,
+    this.postId,
+  });
 
   @override
   State<HomePage> createState() => HomePageState();
 }
-
 class HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> posts = [];
   bool loading = true;
@@ -41,22 +44,22 @@ class HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
   int selectedIndex = 0;
 
-  int limit = 5;
+  int limit = 20;
   int offset = 0;
   bool isLoadingMore = false;
   bool hasMore = true;
-  int? _pendingPostId;
+
 
   late final ScrollController _scrollController;
 
   @override
 
+
+  @override
   void initState() {
     super.initState();
 
-    fetchPosts(this);
 
-    _fetchUserProfile();
 
     instance = this;
 
@@ -67,65 +70,56 @@ class HomePageState extends State<HomePage> {
           fetchPosts(this, loadMore: true);
         }
       });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_pendingPostId != null) {
-        openPost(_pendingPostId!);
-        _pendingPostId = null;
+
+    _fetchUserProfile();
+
+    fetchPosts(this).then((_) async {
+
+      for (final post in posts) {
+        final postId = post["id"];
+
+        final key = postKeys[postId] ??= GlobalKey();
+
+        debugPrint("Post $postId key => $key");
+      }
+
+
+
+      final key = postKeys[16];
+      debugPrint("161616POST 16 KEY => $key");
+      if (key != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final context = key.currentContext;
+          if (context == null) return;
+
+          Scrollable.ensureVisible(
+            context,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+          );
+        });
       }
     });
 
   }
 
-  Future<void> openPost(int postId) async {
-    final index = posts.indexWhere((p) => p["id"] == postId);
+  void scrollToKey(GlobalKey key) {
+    final context = key.currentContext;
+    if (context == null) return;
 
-    // post yoksa hiçbir şey yapma
-    if (index == -1) return;
-
-    final key = postKeys[postId];
-
-    // key yoksa bile index ile scroll yap
-    if (key?.currentContext == null) {
-      await _scrollToIndex(index);
-      _highlightPost(postId);
-      return;
-    }
-
-    await Scrollable.ensureVisible(
-      key!.currentContext!,
+    Scrollable.ensureVisible(
+      context,
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
     );
-
-    _highlightPost(postId);
-  }
-  void _highlightPost(int postId) {
-    setState(() {
-      highlightedPosts.add(postId);
-    });
-
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-
-      setState(() {
-        highlightedPosts.remove(postId);
-      });
-    });
   }
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
   }
-  Future<void> _scrollToIndex(int index) async {
-    await Future.delayed(const Duration(milliseconds: 100));
 
-    _scrollController.animateTo(
-      index * 120, // approx item height
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-    );
-  }
+
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
 
@@ -208,8 +202,8 @@ class HomePageState extends State<HomePage> {
             final post = posts[index];
 
             return Container(
-              key: postKeys[post["id"]] ??= GlobalKey(),
 
+              key: postKeys[post["id"]],
               child: PostCard(
                 post: post,
                 parentContext: context,
@@ -220,8 +214,7 @@ class HomePageState extends State<HomePage> {
                 onJoinCommunity: (communityName, index) =>
                     joinCommunity(this, communityName, index),
 
-                highlight:
-                highlightedPosts.contains(post["id"]),
+
               ),
             );
           },

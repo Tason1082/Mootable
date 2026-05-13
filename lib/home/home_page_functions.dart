@@ -38,21 +38,34 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
     final List raw = data["data"] ?? [];
 
     final posts = raw.map((item) {
-      final p = Map<String, dynamic>.from(item); // 🔥 KRİTİK SATIR
+      final p = Map<String, dynamic>.from(item);
 
       return {
         ...p,
-
         "votes_count": p["netScore"] ?? 0,
         "user_vote": p["userVote"] ?? 0,
-
         "created_at": p["createdAt"],
         "community_name": p["community"],
-
         "medias": p["medias"] ?? [],
         "commentCount": p["commentCount"] ?? 0,
       };
     }).toList();
+
+
+// BURAYA EKLE
+    for (final post in posts) {
+      final postId = post["id"];
+
+      final key = GlobalKey(
+        debugLabel: 'post_$postId',
+      );
+
+      state.postKeys[postId] = key;
+
+      debugPrint(
+        "POST ID: $postId => KEY: $key",
+      );
+    }
 
     state.setState(() {
       state.posts.addAll(posts);
@@ -61,6 +74,7 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
       state.loading = false;
       state.isLoadingMore = false;
     });
+
   } catch (e) {
     debugPrint("FETCH POSTS ERROR: $e");
 
