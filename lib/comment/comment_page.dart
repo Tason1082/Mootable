@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 
 import '../core/api_client.dart';
+import 'comment_service.dart';
 
 class CommentPage extends StatefulWidget {
   final int postId;
@@ -41,40 +42,9 @@ class _CommentPageState extends State<CommentPage> {
 
   Future<void> _fetchComments() async {
     try {
-      final res = await ApiClient.dio.get(
-        '/api/comments/post/${widget.postId}',
-      );
+      final list = await CommentService.getComments(widget.postId);
 
-      final body = res.data;
-
-      debugPrint("COMMENTS RESPONSE: ${res.data.runtimeType}");
-      debugPrint("COMMENTS BODY: ${res.data}");
-
-      if (body is! Map || body["success"] != true) {
-        comments = [];
-        tree = {};
-
-        setState(() {});
-
-        return;
-      }
-
-      final List raw = body["data"] ?? [];
-
-      comments = raw.map((item) {
-        final c = Map<String, dynamic>.from(item);
-
-        return {
-          ...c,
-
-          "votes_count": c["netScore"] ?? 0,
-          "user_vote": c["userVote"] ?? 0,
-
-          "created_at": c["createdAt"],
-
-          "replyCount": c["replyCount"] ?? 0,
-        };
-      }).toList();
+      comments = list;
 
       tree = {};
 
@@ -87,10 +57,8 @@ class _CommentPageState extends State<CommentPage> {
       }
 
       setState(() {});
-    } on DioException catch (e) {
-      debugPrint("Yorumları çekerken hata: ${e.response?.data}");
     } catch (e) {
-      debugPrint("Yorumları çekerken hata: $e");
+      debugPrint("FETCH COMMENTS ERROR: $e");
     }
   }
   Future<void> _addComment() async {
@@ -99,23 +67,17 @@ class _CommentPageState extends State<CommentPage> {
     if (content.isEmpty) return;
 
     try {
-      final response = await ApiClient.dio.post(
-        "/api/comments",
-        data: {
-          "postId": widget.postId,
-          "content": content,
-        },
+      final success = await CommentService.addComment(
+        widget.postId,
+        content,
       );
 
-      final data = response.data;
-
-      if (data["success"] != true) {
-        throw Exception(data["message"]);
+      if (!success) {
+        throw Exception("Comment failed");
       }
 
       _text.clear();
 
-      // 🔥 POST CARD'A HABER VER
       widget.onCommentAdded?.call();
 
       await _fetchComments();
@@ -124,31 +86,20 @@ class _CommentPageState extends State<CommentPage> {
       debugPrint("ADD COMMENT ERROR: $e");
     }
   }
-  Future<void> _addReply(
-      int parentId,
-      String content,
-      ) async {
+  Future<void> _addReply(int parentId, String content) async {
     final text = content.trim();
 
     if (text.isEmpty) return;
 
     try {
-      final response = await ApiClient.dio.post(
-        "/api/comments",
-        data: {
-          "postId": widget.postId,
-          "content": text,
-          "parentId": parentId,
-        },
+      final success = await CommentService.addReply(
+        widget.postId,
+        parentId,
+        text,
       );
 
-      final data = response.data;
-
-      debugPrint("ADD REPLY RESPONSE: ${response.data.runtimeType}");
-      debugPrint("ADD REPLY BODY: ${response.data}");
-
-      if (data["success"] != true) {
-        throw Exception(data["message"]);
+      if (!success) {
+        throw Exception("Reply failed");
       }
 
       await _fetchComments();
@@ -156,25 +107,12 @@ class _CommentPageState extends State<CommentPage> {
       debugPrint("ADD REPLY ERROR: $e");
     }
   }
-  Future<void> _voteComment(
-      int commentId,
-      int vote,
-      ) async {
+  Future<void> _voteComment(int commentId, int vote) async {
     try {
-      final response = await ApiClient.dio.post(
-        "/api/comments/$commentId/vote2",
-        data: {
-          "vote": vote,
-        },
-      );
+      final success = await CommentService.vote(commentId, vote);
 
-      final data = response.data;
-
-      debugPrint("VOTE RESPONSE: ${response.data.runtimeType}");
-      debugPrint("VOTE BODY: ${response.data}");
-
-      if (data["success"] != true) {
-        throw Exception(data["message"]);
+      if (!success) {
+        throw Exception("Vote failed");
       }
 
       await _fetchComments();
@@ -182,25 +120,12 @@ class _CommentPageState extends State<CommentPage> {
       debugPrint("VOTE COMMENT ERROR: $e");
     }
   }
-  Future<void> _editComment(
-      int commentId,
-      String content,
-      ) async {
+  Future<void> _editComment(int commentId, String content) async {
     try {
-      final response = await ApiClient.dio.put(
-        "/api/comments/$commentId",
-        data: {
-          "content": content,
-        },
-      );
+      final success = await CommentService.edit(commentId, content);
 
-      final data = response.data;
-
-      debugPrint("EDIT COMMENT RESPONSE: ${response.data.runtimeType}");
-      debugPrint("EDIT COMMENT BODY: ${response.data}");
-
-      if (data["success"] != true) {
-        throw Exception(data["message"]);
+      if (!success) {
+        throw Exception("Edit failed");
       }
 
       await _fetchComments();
