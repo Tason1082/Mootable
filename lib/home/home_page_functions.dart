@@ -12,10 +12,15 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
     if (!loadMore) {
       state.offset = 0;
       state.posts.clear();
-      state.setState(() => state.loading = true);
+
+      state.setState(() {
+        state.loading = true;
+      });
     }
 
-    state.setState(() => state.isLoadingMore = true);
+    state.setState(() {
+      state.isLoadingMore = true;
+    });
 
     final page = (state.offset ~/ state.limit) + 1;
 
@@ -27,10 +32,16 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
       },
     );
 
-    // 🔥 BACKEND WRAPPER FIX
     final data = response.data;
-    debugPrint("RESPONSE: ${response.data.runtimeType}");
-    debugPrint("RESPONSE BODY: ${response.data}");
+
+    debugPrint(
+      "RESPONSE: ${response.data.runtimeType}",
+    );
+
+    debugPrint(
+      "RESPONSE BODY: ${response.data}",
+    );
+
     if (data["success"] != true) {
       throw Exception(data["message"]);
     }
@@ -51,30 +62,33 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
       };
     }).toList();
 
-
-// BURAYA EKLE
+    // KEY OLUŞTUR
     for (final post in posts) {
       final postId = post["id"];
 
-      final key = GlobalKey(
-        debugLabel: 'post_$postId',
+      state.postKeys.putIfAbsent(
+        postId,
+            () => GlobalKey(
+          debugLabel: 'post_$postId',
+        ),
       );
 
-      state.postKeys[postId] = key;
-
       debugPrint(
-        "POST ID: $postId => KEY: $key",
+        "POST ID: $postId => KEY: ${state.postKeys[postId]}",
       );
     }
 
     state.setState(() {
       state.posts.addAll(posts);
+
       state.offset += state.limit;
+
       state.hasMore = posts.length == state.limit;
+
       state.loading = false;
+
       state.isLoadingMore = false;
     });
-
   } catch (e) {
     debugPrint("FETCH POSTS ERROR: $e");
 

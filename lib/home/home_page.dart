@@ -59,8 +59,6 @@ class HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
 
-
-
     instance = this;
 
     _scrollController = ScrollController()
@@ -74,45 +72,60 @@ class HomePageState extends State<HomePage> {
     _fetchUserProfile();
 
     fetchPosts(this).then((_) async {
-
+      // Post keylerini oluştur
       for (final post in posts) {
         final postId = post["id"];
 
-        final key = postKeys[postId] ??= GlobalKey();
+        postKeys.putIfAbsent(
+          postId,
+              () => GlobalKey(debugLabel: 'post_$postId'),
+        );
 
-        debugPrint("Post $postId key => $key");
+        debugPrint(
+          "Post $postId key => ${postKeys[postId]}",
+        );
       }
 
+      // Post 16'ya git
+      await scrollToPost(16);
+    });
+  }
 
+  Future<void> scrollToPost(int targetId) async {
+    // Post yüklenene kadar fetch yap
+    while (!posts.any((p) => p["id"] == targetId) && hasMore) {
+      await fetchPosts(this, loadMore: true);
+    }
 
-      final key = postKeys[16];
-      debugPrint("161616POST 16 KEY => $key");
-      if (key != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          final context = key.currentContext;
-          if (context == null) return;
+    await Future.delayed(
+      const Duration(milliseconds: 100),
+    );
 
-          Scrollable.ensureVisible(
-            context,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeInOut,
-          );
-        });
+    final index = posts.indexWhere(
+          (p) => p["id"] == targetId,
+    );
+
+    if (index == -1) return;
+
+    // Direkt çat diye git
+    _scrollController.jumpTo(
+      index * 500,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = postKeys[targetId];
+      final context = key?.currentContext;
+
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: Duration.zero,
+        );
       }
     });
-
   }
 
-  void scrollToKey(GlobalKey key) {
-    final context = key.currentContext;
-    if (context == null) return;
 
-    Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-    );
-  }
   @override
   void dispose() {
     _scrollController.dispose();
