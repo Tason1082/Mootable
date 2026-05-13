@@ -53,9 +53,6 @@ class HomePageState extends State<HomePage> {
   late final ScrollController _scrollController;
 
   @override
-
-
-  @override
   void initState() {
     super.initState();
 
@@ -72,22 +69,22 @@ class HomePageState extends State<HomePage> {
     _fetchUserProfile();
 
     fetchPosts(this).then((_) async {
-      // Post keylerini oluştur
+      // Key oluştur
       for (final post in posts) {
         final postId = post["id"];
 
         postKeys.putIfAbsent(
           postId,
-              () => GlobalKey(debugLabel: 'post_$postId'),
-        );
-
-        debugPrint(
-          "Post $postId key => ${postKeys[postId]}",
+              () => GlobalKey(
+            debugLabel: 'post_$postId',
+          ),
         );
       }
 
-      // Post 16'ya git
-      await scrollToPost(16);
+      // Eğer HomePage'e postId geldiyse ona git
+      if (widget.postId != null) {
+        await scrollToPost(widget.postId!);
+      }
     });
   }
 
@@ -107,9 +104,9 @@ class HomePageState extends State<HomePage> {
 
     if (index == -1) return;
 
-    // Direkt çat diye git
+    // Direkt git
     _scrollController.jumpTo(
-      index * 500,
+      index * 300,
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {

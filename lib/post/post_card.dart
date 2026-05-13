@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../TimeAgo.dart';
 import '../chat/conversation_service.dart';
+
 import '../comment/comment_page.dart';
 import '../core/api_client.dart';
 
@@ -13,7 +14,7 @@ import '../core/api_service.dart';
 import '../my_community/community_detail_page.dart';
 import '../newchatpage.dart';
 import '../profile_page.dart';
-import '../quote_post_page.dart';
+
 import 'editpost_page.dart';
 import 'full_screen_image.dart';
 import 'inline_video_player.dart';
@@ -493,8 +494,15 @@ class _PostCardState extends State<PostCard> {
                   Navigator.push(
                     widget.parentContext,
                     MaterialPageRoute(
-                      builder: (_) =>
-                          CommentPage(postId: postId),
+                      builder: (_) => CommentPage(
+                        postId: postId,
+                        onCommentAdded: () {
+                          setState(() {
+                            post["commentCount"] =
+                                (post["commentCount"] ?? 0) + 1;
+                          });
+                        },
+                      ),
                     ),
                   );
                 },

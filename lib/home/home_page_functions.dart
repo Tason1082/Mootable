@@ -4,25 +4,26 @@ import '../community/community_explore_page.dart';
 import '../core/api_client.dart';
 import '../post/post_page.dart';
 import 'home_page.dart';
+Future<void> fetchPosts(
+    dynamic state, {
+      bool loadMore = false,
+    }) async {
+  if (state.isLoadingMore) return;
 
-Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
-  if (state.isLoadingMore || (!state.hasMore && loadMore)) return;
+  if (loadMore && !state.hasMore) return;
 
   try {
     if (!loadMore) {
-      state.offset = 0;
-      state.posts.clear();
-
       state.setState(() {
         state.loading = true;
       });
     }
 
-    state.setState(() {
-      state.isLoadingMore = true;
-    });
+    state.isLoadingMore = true;
 
-    final page = (state.offset ~/ state.limit) + 1;
+    final page = loadMore
+        ? ((state.offset ~/ state.limit) + 1)
+        : 1;
 
     final response = await ApiClient.dio.get(
       "/api/posts",
@@ -34,24 +35,18 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
 
     final data = response.data;
 
-    debugPrint(
-      "RESPONSE: ${response.data.runtimeType}",
-    );
-
-    debugPrint(
-      "RESPONSE BODY: ${response.data}",
-    );
-
     if (data["success"] != true) {
       throw Exception(data["message"]);
     }
 
     final List raw = data["data"] ?? [];
 
-    final posts = raw.map((item) {
+    final List<Map<String, dynamic>> fetchedPosts = [];
+
+    for (final item in raw) {
       final p = Map<String, dynamic>.from(item);
 
-      return {
+      final mappedPost = {
         ...p,
         "votes_count": p["netScore"] ?? 0,
         "user_vote": p["userVote"] ?? 0,
@@ -60,11 +55,8 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
         "medias": p["medias"] ?? [],
         "commentCount": p["commentCount"] ?? 0,
       };
-    }).toList();
 
-    // KEY OLUŞTUR
-    for (final post in posts) {
-      final postId = post["id"];
+      final postId = mappedPost["id"];
 
       state.postKeys.putIfAbsent(
         postId,
@@ -73,32 +65,51 @@ Future<void> fetchPosts(dynamic state, {bool loadMore = false}) async {
         ),
       );
 
-      debugPrint(
-        "POST ID: $postId => KEY: ${state.postKeys[postId]}",
-      );
+      fetchedPosts.add(mappedPost);
     }
 
+    if (!state.mounted) return;
+
     state.setState(() {
-      state.posts.addAll(posts);
+      if (loadMore) {
+        state.posts.addAll(fetchedPosts);
+      } else {
+        final Map<dynamic, Map<String, dynamic>> merged = {
+          for (var post in state.posts)
+            post["id"]: Map<String, dynamic>.from(post),
+        };
 
-      state.offset += state.limit;
+        for (final post in fetchedPosts) {
+          merged[post["id"]] = post;
+        }
 
-      state.hasMore = posts.length == state.limit;
+        state.posts = merged.values.toList()
+          ..sort((a, b) {
+            final aDate = DateTime.parse(a["created_at"]);
+            final bDate = DateTime.parse(b["created_at"]);
+
+            return bDate.compareTo(aDate);
+          });
+      }
+
+      state.offset = state.posts.length;
+
+      state.hasMore = fetchedPosts.length >= state.limit;
 
       state.loading = false;
-
-      state.isLoadingMore = false;
     });
   } catch (e) {
     debugPrint("FETCH POSTS ERROR: $e");
 
+    if (!state.mounted) return;
+
     state.setState(() {
       state.loading = false;
-      state.isLoadingMore = false;
     });
+  } finally {
+    state.isLoadingMore = false;
   }
 }
-
 
 /// =======================================================
 /// JOIN COMMUNITY (API)

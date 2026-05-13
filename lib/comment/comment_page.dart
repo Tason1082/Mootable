@@ -6,9 +6,11 @@ import '../core/api_client.dart';
 class CommentPage extends StatefulWidget {
   final int postId;
 
+  final VoidCallback? onCommentAdded;
   const CommentPage({
     super.key,
     required this.postId,
+    this.onCommentAdded,
   });
 
   @override
@@ -107,16 +109,17 @@ class _CommentPageState extends State<CommentPage> {
 
       final data = response.data;
 
-      debugPrint("ADD COMMENT RESPONSE: ${response.data.runtimeType}");
-      debugPrint("ADD COMMENT BODY: ${response.data}");
-
       if (data["success"] != true) {
         throw Exception(data["message"]);
       }
 
       _text.clear();
 
+      // 🔥 POST CARD'A HABER VER
+      widget.onCommentAdded?.call();
+
       await _fetchComments();
+
     } catch (e) {
       debugPrint("ADD COMMENT ERROR: $e");
     }
