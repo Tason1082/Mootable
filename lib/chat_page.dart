@@ -28,6 +28,9 @@ class _ChatPageState extends State<ChatPage> {
 
       await Future.wait(
         list.map((convo) async {
+
+          if (convo.isGroup) return;
+
           final user = await ApiService.getUserById(convo.name);
 
           convo.username = user?["username"] ?? "Unknown";
@@ -79,7 +82,9 @@ class _ChatPageState extends State<ChatPage> {
                   : null,
             ),
             title: Text(
-              convo.username ?? "Unknown",
+              convo.isGroup
+                  ? convo.name
+                  : convo.username ?? "Unknown",
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(

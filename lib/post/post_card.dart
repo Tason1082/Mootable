@@ -11,6 +11,7 @@ import '../core/api_client.dart';
 
 
 import '../core/api_service.dart';
+
 import '../my_community/community_detail_page.dart';
 import '../newchatpage.dart';
 import '../profile_page.dart';
@@ -410,6 +411,8 @@ class _PostCardState extends State<PostCard> {
 
                 GestureDetector(
                   onTap: () {
+
+                    debugPrint("COMMUNITY FIELD => ${post["community"]}");
                     if (post["community"] == null) return;
 
                     Navigator.push(

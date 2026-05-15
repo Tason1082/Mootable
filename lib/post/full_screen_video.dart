@@ -31,7 +31,7 @@ class _FullScreenVideoPageState extends State<FullScreenVideoPage> {
     });
   }
 
-  @override
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

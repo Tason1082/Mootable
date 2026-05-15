@@ -1,17 +1,13 @@
-import 'dart:typed_data';
-import 'package:firebase_dynamic_links/firebase_dynamic_links.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
-import '../TimeAgo.dart';
-import '../comment/comment_page.dart';
+
 import '../core/api_service.dart';
 import '../post/post_card.dart';
-import '../quote_post_page.dart';
-import '../video_player_widget.dart';
+
 import '../core/api_client.dart';
 
 // 🔥 EKLENDİ
@@ -29,6 +25,7 @@ class CommunityDetailPage extends StatefulWidget {
 class _CommunityDetailPageState extends State<CommunityDetailPage> {
   Map<String, dynamic>? community;
   bool isLoading = true;
+
   String? error;
   bool _isJoined = false;
   bool _loadingJoin = true;
@@ -253,7 +250,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     try {
       final response = await ApiClient.dio.get(
-        '/api/communities/${widget.communityName}',
+          '/api/communities/by-name/${widget.communityName}'
       );
 
       final body = response.data;

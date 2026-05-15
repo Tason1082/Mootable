@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/api_service.dart';
 import 'community_detail_page.dart';
 
+
 class MyCommunityPage extends StatefulWidget {
   const MyCommunityPage({super.key});
 
