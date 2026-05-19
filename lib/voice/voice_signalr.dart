@@ -43,7 +43,7 @@ class VoiceSignalR {
   }) async {
     connection = HubConnectionBuilder()
         .withUrl(
-      "http://192.168.0.5:5004/voicehub",
+      "http://10.0.2.2:5004/voicehub",
       options: HttpConnectionOptions(
         accessTokenFactory: () async {
           final token = await AuthService.getToken();

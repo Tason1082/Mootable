@@ -12,6 +12,7 @@ import '../core/api_client.dart';
 
 // 🔥 EKLENDİ
 import '../home/home_page_functions.dart';
+import 'community_settings_page.dart';
 
 class CommunityDetailPage extends StatefulWidget {
   final String communityName;
@@ -25,19 +26,34 @@ class CommunityDetailPage extends StatefulWidget {
 class _CommunityDetailPageState extends State<CommunityDetailPage> {
   Map<String, dynamic>? community;
   bool isLoading = true;
-
+  bool _isAdult = false;
   String? error;
   bool _isJoined = false;
   bool _loadingJoin = true;
+  late String communityName;
   List<Map<String, dynamic>> filteredPosts = [];
   TextEditingController searchController = TextEditingController();
   bool isSearching = false;
   // 🔥 EKLENDİ (joinCommunity için gerekli)
   List<Map<String, dynamic>> posts = [];
+  final TextEditingController _nameController =
+  TextEditingController();
 
+  final TextEditingController _descriptionController =
+  TextEditingController();
+
+  final TextEditingController _topicsController =
+  TextEditingController();
+
+  String _selectedType = "public";
+
+
+
+  bool _updatingCommunity = false;
   @override
   void initState() {
     super.initState();
+    communityName = widget.communityName;
     fetchCommunity();
   }
   void _filterPosts(String query) {
@@ -115,7 +131,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
     );
   }
   void _shareCommunity() {
-    final url = "https://mootable.com/r/${widget.communityName}";
+    final url = "https://mootable.com/r/${communityName}";
 
     Share.share(
       "Bu community'ye bak 👇\n$url",
@@ -190,6 +206,14 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       );
     }
   }
+  bool get canManageCommunity {
+    final role = community?['myRole'];
+
+    // Leader = 0
+    // CoLeader = 1
+
+    return role == 0 || role == 1;
+  }
   Future<void> _toggleJoin() async {
     final communityId = posts.isNotEmpty
         ? posts[0]["communityId"].toString()
@@ -250,7 +274,7 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     try {
       final response = await ApiClient.dio.get(
-          '/api/communities/by-name/${widget.communityName}'
+          '/api/communities/${communityName}'
       );
 
       final body = response.data;
@@ -275,14 +299,37 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
           'banner': data['bannerUrl'],
           'memberCount': data['memberCount'],
           'isMember': data['isMember'],
+          'myRole': data['myRole'],
+
+          // EKLE
+          'type': data['type'] ?? 'public',
+          'topics': data['topics'] ?? [],
+          'isAdult': data['isAdult'] ?? false,
         };
+
+// CONTROLLERLARI DOLDUR
+        _nameController.text = data['name'] ?? '';
+
+        _descriptionController.text =
+            data['description'] ?? '';
+
+        _topicsController.text =
+            (data['topics'] as List?)
+                ?.join(", ") ??
+                '';
+
+        _selectedType =
+            data['type'] ?? 'public';
+
+        _isAdult =
+            data['isAdult'] ?? false;
 
         isLoading = false;
       });
 
       // POSTS
       final response2 = await ApiClient.dio.get(
-        '/api/posts/community/byname/${widget.communityName}',
+        '/api/posts/community/byname/${communityName}',
       );
 
       final postsBody = response2.data;
@@ -328,6 +375,64 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
 
     _checkIfJoined();
   }
+  Future<void> _updateCommunity() async {
+    try {
+      setState(() {
+        _updatingCommunity = true;
+      });
+
+      final communityId = community?['id'];
+
+      final topics = _topicsController.text
+          .split(",")
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      final body = {
+        "name": _nameController.text.trim(),
+        "description":
+        _descriptionController.text.trim(),
+        "topics": topics,
+        "type": _selectedType,
+        "isAdult": _isAdult,
+      };
+
+      final response = await ApiClient.dio.put(
+        "/api/communities/$communityId",
+        data: body,
+      );
+
+      final data = response.data;
+
+      if (data["success"] != true) {
+        throw Exception(data["message"]);
+      }
+
+      Navigator.pop(context);
+
+      await fetchCommunity();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Topluluk güncellendi"),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Güncelleme başarısız: $e"),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _updatingCommunity = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -435,24 +540,53 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
                     const SizedBox(width: 4),
                     const Text("Haftalık 1 ziyaretçi"),
                     const Spacer(),
-                    _loadingJoin
-                        ? const SizedBox(
-                      width: 80,
-                      child: Center(
-                          child:
-                          CircularProgressIndicator(strokeWidth: 2)),
-                    )
-                        : ElevatedButton(
-                      onPressed: _toggleJoin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                        _isJoined ? Colors.grey[300] : null,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (canManageCommunity)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child:OutlinedButton(
+                              onPressed: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => CommunitySettingsPage(
+                                      community: community!,
+                                      onUpdated: fetchCommunity,
+                                      onNameChanged: (newName) {
+                                        setState(() {
+                                          communityName = newName;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text("Topluluk Ayarları"),
+                            ),
+                          ),
+
+                        _loadingJoin
+                            ? const SizedBox(
+                          width: 80,
+                          child: Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                            : ElevatedButton(
+                          onPressed: _toggleJoin,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor:
+                            _isJoined ? Colors.grey[300] : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          child: Text(_isJoined ? "Ayrıl" : "Katıl"),
                         ),
-                      ),
-                      child: Text(_isJoined ? "Ayrıl" : "Katıl"),
-                    ),
+                      ],
+                    )
                   ],
                 ),
               ],
