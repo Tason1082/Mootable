@@ -23,7 +23,7 @@ class VoiceRoomPage extends StatefulWidget {
 class _VoiceRoomPageState extends State<VoiceRoomPage> {
   bool loading = true;
   List<String> members = [];
-  Map<String, String> usernames = {};
+  Map<String, Map<String, dynamic>> users = {};
   String? myUserId;
 
 
@@ -76,30 +76,36 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
     try {
       final data = await VoiceService.getMembers(widget.roomId);
 
-      Map<String, String> tempUsernames = {};
+      Map<String, Map<String, dynamic>> tempUsers = {};
 
       for (var userId in data) {
         final user = await ApiService.getUserById(userId);
 
-        tempUsernames[userId] = user?["username"] ?? "Unknown";
+        tempUsers[userId] = {
+          "username": user?["username"] ?? "Unknown",
+          "profileImageUrl": user?["profileImageUrl"],
+        };
       }
 
       setState(() {
         members = data;
-        usernames = tempUsernames;
+        users = tempUsers;
         loading = false;
       });
-
     } catch (e) {
       print("[DEBUG] Load members error -> $e");
       setState(() => loading = false);
     }
   }
-  void syncUsernames(List<String> membersList) async {
+  Future<void> syncUsers(List<String> membersList) async {
     for (var userId in membersList) {
-      if (!usernames.containsKey(userId)) {
+      if (!users.containsKey(userId)) {
         final user = await ApiService.getUserById(userId);
-        usernames[userId] = user?["username"] ?? "Unknown";
+
+        users[userId] = {
+          "username": user?["username"] ?? "Unknown",
+          "profileImageUrl": user?["profileImageUrl"],
+        };
       }
     }
 
@@ -273,9 +279,8 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                   valueListenable: VoiceManager().members,
                   builder: (context, members, _) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      syncUsernames(members);
+                      syncUsers(members);
                     });
-
                     return GridView.builder(
                       itemCount: members.length,
                       gridDelegate:
@@ -288,14 +293,17 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                       itemBuilder: (context, index) {
                         final user = members[index];
 
+                        final username =
+                            users[user]?["username"] ?? user;
+
+                        final profileImageUrl =
+                        users[user]?["profileImageUrl"];
+
                         return Material(
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(16),
                             onTap: () {
-                              final username =
-                                  usernames[user] ?? user;
-
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -311,22 +319,28 @@ class _VoiceRoomPageState extends State<VoiceRoomPage> {
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Column(
-                                mainAxisAlignment:
-                                MainAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const CircleAvatar(
+                                  CircleAvatar(
                                     radius: 28,
                                     backgroundColor: Colors.white,
-                                    child: Icon(Icons.person),
+                                    backgroundImage: profileImageUrl != null &&
+                                        profileImageUrl.toString().isNotEmpty
+                                        ? NetworkImage(profileImageUrl)
+                                        : null,
+                                    child: profileImageUrl == null ||
+                                        profileImageUrl.toString().isEmpty
+                                        ? const Icon(Icons.person)
+                                        : null,
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    usernames[user] ?? user,
+                                    username,
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                  )
+                                  ),
                                 ],
                               ),
                             ),

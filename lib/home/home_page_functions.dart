@@ -133,9 +133,6 @@ Future<void> joinCommunity(
 
 
 
-
-
-
 Future<void> toggleVote(dynamic state, int postId, int vote) async {
   final index = state.posts.indexWhere((p) => p["id"] == postId);
   if (index == -1) return;
@@ -164,6 +161,9 @@ Future<void> toggleVote(dynamic state, int postId, int vote) async {
     );
   }
 }
+
+
+
 
 
 

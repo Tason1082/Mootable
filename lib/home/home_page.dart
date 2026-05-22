@@ -128,8 +128,6 @@ class HomePageState extends State<HomePage> {
     _scrollController.dispose();
     super.dispose();
   }
-
-
   Future<void> _fetchUserProfile() async {
     if (user == null) return;
 
@@ -152,6 +150,8 @@ class HomePageState extends State<HomePage> {
       ErrorHandler.showError(context, e, stackTrace: st);
     }
   }
+
+
 
 
 
