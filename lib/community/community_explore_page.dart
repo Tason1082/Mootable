@@ -275,7 +275,7 @@ class _CommunityExplorePageState
               MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Communities",
+                  "Topluluklar",
                   style: TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.w800,
@@ -286,7 +286,7 @@ class _CommunityExplorePageState
                 const SizedBox(height: 10),
 
                 Text(
-                  "Discover people with the same interests.",
+                  "Aynı ilgi alanlara sahip insanları bul!..",
                   style: TextStyle(
                     color: Colors.white
                         .withOpacity(.9),

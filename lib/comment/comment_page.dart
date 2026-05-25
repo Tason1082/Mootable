@@ -221,87 +221,87 @@ class _CommentPageState extends State<CommentPage> {
         left: depth * 20,
         top: 10,
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            c["username"] ?? "Unknown",
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: c["profileImageUrl"] != null
+                ? NetworkImage(c["profileImageUrl"])
+                : null,
+            child: c["profileImageUrl"] == null
+                ? const Icon(Icons.person, size: 18)
+                : null,
           ),
 
-          const SizedBox(height: 4),
+          const SizedBox(width: 10),
 
-          Text(c["content"] ?? ""),
-
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_upward,
-                  color: userVote == 1
-                      ? Colors.orange
-                      : Colors.grey,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  c["username"] ?? "Unknown",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                onPressed: () {
-                  _voteComment(c["id"], 1);
-                },
-              ),
 
-              Text(score.toString()),
+                const SizedBox(height: 3),
 
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_downward,
-                  color: userVote == -1
-                      ? Colors.blue
-                      : Colors.grey,
+                Text(
+                  c["content"] ?? "",
+                  style: const TextStyle(
+                    fontSize: 14,
+                  ),
                 ),
-                onPressed: () {
-                  _voteComment(c["id"], -1);
-                },
-              ),
 
-              TextButton(
-                onPressed: () {
-                  _showReplyDialog(c["id"]);
-                },
-                child: const Text("Yanıtla"),
-              ),
+                const SizedBox(height: 6),
 
-              if (c["isOwner"] == true)
-                TextButton(
-                  onPressed: () {
-                    _showEditDialog(
-                      c["id"],
-                      c["content"] ?? "",
-                    );
-                  },
-                  child: const Text("Düzenle"),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_upward,
+                        size: 18,
+                        color: (c["userVote"] ?? 0) == 1
+                            ? Colors.orange
+                            : Colors.grey,
+                      ),
+                      onPressed: () => _voteComment(c["id"], 1),
+                    ),
+
+                    Text((c["netScore"] ?? 0).toString()),
+
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_downward,
+                        size: 18,
+                        color: (c["userVote"] ?? 0) == -1
+                            ? Colors.blue
+                            : Colors.grey,
+                      ),
+                      onPressed: () => _voteComment(c["id"], -1),
+                    ),
+
+                    TextButton(
+                      onPressed: () => _showReplyDialog(c["id"]),
+                      child: const Text("Yanıtla"),
+                    ),
+
+                    if (c["isOwner"] == true)
+                      TextButton(
+                        onPressed: () => _showEditDialog(
+                          c["id"],
+                          c["content"] ?? "",
+                        ),
+                        child: const Text("Düzenle"),
+                      ),
+                  ],
                 ),
-            ],
-          ),
-
-          if (children.isNotEmpty)
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  replyVisibility[c["id"]] =
-                  !(replyVisibility[c["id"]] ?? false);
-                });
-              },
-              child: Text(
-                (replyVisibility[c["id"]] ?? false)
-                    ? "Yanıtları gizle"
-                    : "${children.length} yanıtı gör",
-                style: const TextStyle(fontSize: 13),
-              ),
+              ],
             ),
-
-          if (replyVisibility[c["id"]] ?? false)
-            for (var reply in children)
-              _buildComment(reply, depth + 1),
+          ),
         ],
       ),
     );

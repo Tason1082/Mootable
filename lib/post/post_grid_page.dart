@@ -289,7 +289,7 @@ class _PostsGridPageState extends State<PostsGridPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(l10n.saved_posts_title),
+        title: Text("Paylaşımların"),
       ),
       body: loading && posts.isEmpty
           ? const Center(child: CircularProgressIndicator())
