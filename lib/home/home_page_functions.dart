@@ -51,7 +51,7 @@ Future<void> fetchPosts(
         "votes_count": p["netScore"] ?? 0,
         "user_vote": p["userVote"] ?? 0,
         "created_at": p["createdAt"],
-        "community_name": p["community"],
+        "communityName": p["communityName"],
         "medias": p["medias"] ?? [],
         "commentCount": p["commentCount"] ?? 0,
       };

@@ -413,20 +413,20 @@ class _PostCardState extends State<PostCard> {
                 GestureDetector(
                   onTap: () {
 
-                    debugPrint("COMMUNITY FIELD => ${post["community"]}");
-                    if (post["community"] == null) return;
+                    debugPrint("COMMUNITY FIELD => ${post["communityName"]}");
+                    if (post["communityName"] == null) return;
 
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => CommunityDetailPage(
-                          communityName: post["community"],
+                          communityName: post["communityName"],
                         ),
                       ),
                     );
                   },
                   child: Text(
-                    post["community"] ?? "",
+                    post["communityName"] ?? "",
                     style: TextStyle(color: colors.primary),
                   ),
                 ),
