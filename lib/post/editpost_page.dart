@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/api_client.dart';
+import '../core/api_service.dart';
 
 class EditPostPage extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -22,7 +23,9 @@ class _EditPostPageState extends State<EditPostPage> {
   late TextEditingController linkController;
   late TextEditingController communityController;
   late TextEditingController tagsController;
+  List<dynamic> communities = [];
 
+  String? selectedCommunityId;
   File? selectedMedia;
   bool isVideo = false;
 
@@ -46,15 +49,37 @@ class _EditPostPageState extends State<EditPostPage> {
         TextEditingController(text: post["link"] ?? "");
 
     communityController =
-        TextEditingController(text: post["community"] ?? "");
+        TextEditingController(text: post["communityName"] ?? "");
 
     tagsController = TextEditingController(
       text: (post["tags"] ?? []).join(", "),
     );
+    loadCommunities(); // EKLE
   }
 
   // ================= PICK IMAGE =================
+  bool communitiesLoaded = false;
 
+  Future<void> loadCommunities() async {
+    final data = await ApiService.getMyCommunities();
+
+    setState(() {
+      communities = data;
+
+      final currentCommunityName =
+      widget.post["communityName"];
+
+      final selected =
+      communities.cast<Map<String, dynamic>>().firstWhere(
+            (x) => x["name"] == currentCommunityName,
+        orElse: () => {},
+      );
+
+      if (selected.isNotEmpty) {
+        selectedCommunityId = selected["id"];
+      }
+    });
+  }
   Future<void> pickImage() async {
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
@@ -96,7 +121,8 @@ class _EditPostPageState extends State<EditPostPage> {
         if (linkController.text.isNotEmpty)
           "link": linkController.text,
 
-        "community": communityController.text,
+        if (selectedCommunityId != null)
+          "communityId": selectedCommunityId,
 
         // BACKEND string[] bekliyorsa
         "tags": tagsController.text
@@ -257,7 +283,33 @@ class _EditPostPageState extends State<EditPostPage> {
 
             field("Link", linkController),
 
-            field("Community", communityController),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child:DropdownButtonFormField<String>(
+                onTap: () {
+                  loadCommunities();
+                },
+                value: selectedCommunityId,
+                decoration: const InputDecoration(
+                  labelText: "Community",
+                  border: OutlineInputBorder(),
+                ),
+                items: communities.map((c) {
+                  return DropdownMenuItem<String>(
+                    value: c["id"],
+                    child: Text(c["name"]),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    selectedCommunityId = value;
+                  });
+                },
+              ),
+            ),
 
             field(
               "Tags (comma separated)",

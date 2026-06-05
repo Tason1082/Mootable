@@ -22,7 +22,10 @@ class _CommentPageState extends State<CommentPage> {
   List<Map<String, dynamic>> comments = [];
 
   Map<int?, List<Map<String, dynamic>>> tree = {};
+  int? replyingTo;
 
+  final TextEditingController _replyController =
+  TextEditingController();
   final _text = TextEditingController();
 
   /// replies açık/kapalı
@@ -37,9 +40,25 @@ class _CommentPageState extends State<CommentPage> {
   @override
   void dispose() {
     _text.dispose();
+    _replyController.dispose();
     super.dispose();
   }
+  List<Map<String, dynamic>> getAllReplies(int commentId) {
+    List<Map<String, dynamic>> result = [];
 
+    void collect(int id) {
+      final children = tree[id] ?? [];
+
+      for (final child in children) {
+        result.add(child);
+        collect(child["id"]);
+      }
+    }
+
+    collect(commentId);
+
+    return result;
+  }
   Future<void> _fetchComments() async {
     try {
       final list = await CommentService.getComments(widget.postId);
@@ -165,7 +184,17 @@ class _CommentPageState extends State<CommentPage> {
       },
     );
   }
+  int getReplyCount(int commentId) {
+    final children = tree[commentId] ?? [];
 
+    int total = children.length;
+
+    for (final child in children) {
+      total += getReplyCount(child["id"]);
+    }
+
+    return total;
+  }
   void _showEditDialog(
       int commentId,
       String oldContent,
@@ -206,102 +235,276 @@ class _CommentPageState extends State<CommentPage> {
       },
     );
   }
-
   Widget _buildComment(
       Map<String, dynamic> c,
       int depth,
       ) {
-    final int score = c["netScore"] ?? 0;
-    final int userVote = c["userVote"] ?? 0;
+    final children = getAllReplies(c["id"]);
 
-    final children = tree[c["id"]] ?? [];
+    final int commentId = c["id"];
+    final bool showReplies =
+        replyVisibility[commentId] ?? false;
 
     return Padding(
       padding: EdgeInsets.only(
-        left: depth * 20,
+        left: depth == 0 ? 0 : 20,
         top: 10,
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundImage: c["profileImageUrl"] != null
-                ? NetworkImage(c["profileImageUrl"])
-                : null,
-            child: c["profileImageUrl"] == null
-                ? const Icon(Icons.person, size: 18)
-                : null,
-          ),
+          Row(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundImage:
+                c["profileImageUrl"] != null
+                    ? NetworkImage(
+                  c["profileImageUrl"],
+                )
+                    : null,
+                child: c["profileImageUrl"] == null
+                    ? const Icon(
+                  Icons.person,
+                  size: 18,
+                )
+                    : null,
+              ),
 
-          const SizedBox(width: 10),
+              const SizedBox(width: 10),
 
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  c["username"] ?? "Unknown",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                Text(
-                  c["content"] ?? "",
-                  style: const TextStyle(
-                    fontSize: 14,
-                  ),
-                ),
-
-                const SizedBox(height: 6),
-
-                Row(
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_upward,
-                        size: 18,
-                        color: (c["userVote"] ?? 0) == 1
-                            ? Colors.orange
-                            : Colors.grey,
+                    Text(
+                      c["username"] ?? "Unknown",
+                      style: const TextStyle(
+                        fontWeight:
+                        FontWeight.bold,
                       ),
-                      onPressed: () => _voteComment(c["id"], 1),
                     ),
 
-                    Text((c["netScore"] ?? 0).toString()),
+                    const SizedBox(height: 3),
 
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_downward,
-                        size: 18,
-                        color: (c["userVote"] ?? 0) == -1
-                            ? Colors.blue
-                            : Colors.grey,
-                      ),
-                      onPressed: () => _voteComment(c["id"], -1),
+                    Text(
+                      c["content"] ?? "",
                     ),
 
-                    TextButton(
-                      onPressed: () => _showReplyDialog(c["id"]),
-                      child: const Text("Yanıtla"),
-                    ),
+                    const SizedBox(height: 6),
 
-                    if (c["isOwner"] == true)
-                      TextButton(
-                        onPressed: () => _showEditDialog(
-                          c["id"],
-                          c["content"] ?? "",
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_upward,
+                            size: 18,
+                            color:
+                            (c["userVote"] ??
+                                0) ==
+                                1
+                                ? Colors.orange
+                                : Colors.grey,
+                          ),
+                          onPressed: () =>
+                              _voteComment(
+                                commentId,
+                                1,
+                              ),
                         ),
-                        child: const Text("Düzenle"),
+
+                        Text(
+                          (c["netScore"] ?? 0)
+                              .toString(),
+                        ),
+
+                        IconButton(
+                          icon: Icon(
+                            Icons
+                                .arrow_downward,
+                            size: 18,
+                            color:
+                            (c["userVote"] ??
+                                0) ==
+                                -1
+                                ? Colors.blue
+                                : Colors.grey,
+                          ),
+                          onPressed: () =>
+                              _voteComment(
+                                commentId,
+                                -1,
+                              ),
+                        ),
+
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              replyingTo =
+                              replyingTo ==
+                                  commentId
+                                  ? null
+                                  : commentId;
+                            });
+                          },
+                          child: const Text(
+                            "Yanıtla",
+                          ),
+                        ),
+
+                        if (c["isOwner"] == true)
+                          TextButton(
+                            onPressed: () =>
+                                _showEditDialog(
+                                  commentId,
+                                  c["content"] ??
+                                      "",
+                                ),
+                            child: const Text(
+                              "Düzenle",
+                            ),
+                          ),
+                      ],
+                    ),
+
+                    if (replyingTo == commentId)
+                      Padding(
+                        padding:
+                        const EdgeInsets.only(
+                          top: 8,
+                          bottom: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller:
+                                _replyController,
+                                decoration:
+                                InputDecoration(
+                                  hintText:
+                                  "Yanıt yaz...",
+                                  border:
+                                  OutlineInputBorder(
+                                    borderRadius:
+                                    BorderRadius.circular(
+                                      20,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            IconButton(
+                              icon: const Icon(
+                                Icons.send,
+                              ),
+                              onPressed:
+                                  () async {
+                                await _addReply(
+                                  commentId,
+                                  _replyController
+                                      .text,
+                                );
+
+                                _replyController
+                                    .clear();
+
+                                if (mounted) {
+                                  setState(() {
+                                    replyingTo =
+                                    null;
+                                    replyVisibility[
+                                    commentId] =
+                                    true;
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    if (depth == 0 && children.isNotEmpty)
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            replyVisibility[commentId] = !showReplies;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 4,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 30,
+                                height: 1,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                showReplies
+                                    ? "Yanıtları gizle"
+                                    : "${getReplyCount(commentId)} yanıtı görüntüle",
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+
+          if (showReplies)
+            ...children.map(
+                  (reply) => Padding(
+                padding: const EdgeInsets.only(
+                  left: 20,
+                  top: 8,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage: reply["profileImageUrl"] != null
+                          ? NetworkImage(reply["profileImageUrl"])
+                          : null,
+                      child: reply["profileImageUrl"] == null
+                          ? const Icon(Icons.person, size: 14)
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reply["username"] ?? "",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(reply["content"] ?? ""),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

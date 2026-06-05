@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'community_mod_mail_page.dart';
 import '../core/api_service.dart';
 import '../post/post_card.dart';
 
@@ -266,6 +267,76 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
       }
     }
   }
+  void _showCommunityMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.favorite_border),
+                title: const Text("Özel akışa ekle"),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.sell_outlined),
+                title: const Text("Rozeti düzenle"),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text(
+                  "Bu topluluk hakkında daha fazla bilgi edin",
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.notifications_none),
+                title: const Text("Moderatörlere mesaj at"),
+                onTap: () {
+                  Navigator.pop(context);
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CommunityModMailPage(
+                        communityId: community?['id']?.toString() ?? '',
+                        communityName: community?['name'] ?? '',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.volume_off_outlined),
+                title: Text(
+                  "ship/${community?['name']} adlı subtable'i sessize al",
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.add),
+                title: const Text("Ana ekrana ekle"),
+                onTap: () {
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
   Future<void> fetchCommunity() async {
     setState(() {
       isLoading = true;
@@ -506,7 +577,10 @@ class _CommunityDetailPageState extends State<CommunityDetailPage> {
             onPressed: _shareCommunity,
           ),
           const SizedBox(width: 12),
-          const Icon(Icons.more_vert),
+          IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: _showCommunityMenu,
+          ),
           const SizedBox(width: 8),
         ],
       ),

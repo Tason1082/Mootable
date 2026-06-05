@@ -47,7 +47,7 @@ class CommentService {
       data: {
         "postId": postId,
         "content": content,
-        "parentId": parentId,
+        "ParentCommentId": parentId,
       },
     );
 

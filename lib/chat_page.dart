@@ -4,6 +4,7 @@ import 'chat/chat_detail_page.dart';
 import 'chat/conversation_list_model.dart';
 import 'chat/conversation_service.dart';
 import 'core/api_service.dart';
+import 'my_community/mod_mail_page.dart';
 import 'newchatpage.dart';
 
 class ChatPage extends StatefulWidget {
@@ -251,7 +252,7 @@ class _ChatPageState extends State<ChatPage> {
               Tab(text: "Mesajlar"),
               Tab(text: "Okunmamış"),
               Tab(text: "İstekler"),
-              Tab(text: "İleti dizisi"),
+              Tab(text: "Mod Mail"),
             ],
           ),
           actions: [
@@ -274,10 +275,10 @@ class _ChatPageState extends State<ChatPage> {
         ),
         body: TabBarView(
           children: [
-            _buildConversationList(),
-            const SizedBox(),
-            const SizedBox(),
-            const SizedBox(),
+            _buildConversationList(), // Mesajlar
+            _buildConversationList(), // Okunmamış (sonra filtreleyeceğiz)
+            const SizedBox(),         // İstekler (sonra doldurulur)
+            const ModMailPage(),      // 👈 MOD MAIL BURAYA
           ],
         ),
         floatingActionButton: FloatingActionButton(

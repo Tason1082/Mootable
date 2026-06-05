@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../core/api_client.dart';
 
@@ -54,7 +55,49 @@ class _CommunitySettingsPageState
     isAdult =
         widget.community['isAdult'] ?? false;
   }
+  Future<void> _pickAndUploadBanner() async {
+    try {
+      final picker = ImagePicker();
 
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+      );
+
+      if (picked == null) return;
+
+      final communityId = widget.community['id'];
+
+      final formData = FormData.fromMap({
+        "file": await MultipartFile.fromFile(picked.path),
+        "type": "banner",
+      });
+
+      final response = await ApiClient.dio.post(
+        "/api/communities/$communityId/upload-image",
+        data: formData,
+      );
+
+      final data = response.data;
+
+      if (data["success"] != true) {
+        throw Exception(data["message"]);
+      }
+
+      await widget.onUpdated();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Banner güncellendi")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Banner upload hatası: $e")),
+      );
+    }
+  }
   Future<void> updateCommunity() async {
     try {
       setState(() {
@@ -222,6 +265,16 @@ class _CommunitySettingsPageState
 
               title: const Text("18+ İçerik"),
             ),
+            const SizedBox(height: 24),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _pickAndUploadBanner,
+                child: const Text("Banner değiştir"),
+              ),
+            ),
+
 
             const SizedBox(height: 24),
 

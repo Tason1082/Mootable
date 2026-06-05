@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../chat_page.dart';
 import '../community/community_explore_page.dart';
 import '../core/api_client.dart';
+import '../core/api_helper.dart';
 import '../post/post_page.dart';
 import 'home_page.dart';
 Future<void> fetchPosts(
@@ -33,13 +34,14 @@ Future<void> fetchPosts(
       },
     );
 
-    final data = response.data;
+    final api = ApiHelper.parse<List>(
+      response,
+          (json) => List.from(json ?? []),
+    );
 
-    if (data["success"] != true) {
-      throw Exception(data["message"]);
-    }
+    final raw = api.data ?? [];
 
-    final List raw = data["data"] ?? [];
+
 
     final List<Map<String, dynamic>> fetchedPosts = [];
 
@@ -112,6 +114,7 @@ Future<void> fetchPosts(
 }
 
 /// =======================================================
+/// =======================================================
 /// JOIN COMMUNITY (API)
 /// =======================================================
 Future<void> joinCommunity(
@@ -120,21 +123,32 @@ Future<void> joinCommunity(
     int postIndex,
     ) async {
   try {
-    await ApiClient.dio.post(
+    final res = await ApiClient.dio.post(
       "/api/communities/join",
       data: {"communityId": communityId},
     );
 
+    ApiHelper.parse<dynamic>(res, null);
+
     state.setState(() {
       state.posts[postIndex]["is_member"] = true;
     });
-  } catch (_) {}
+  } catch (e) {
+    debugPrint("JOIN COMMUNITY ERROR: $e");
+  }
 }
 
+/// =======================================================
+/// TOGGLE VOTE
+/// =======================================================
+Future<void> toggleVote(
+    dynamic state,
+    int postId,
+    int vote,
+    ) async {
+  final index =
+  state.posts.indexWhere((p) => p["id"] == postId);
 
-
-Future<void> toggleVote(dynamic state, int postId, int vote) async {
-  final index = state.posts.indexWhere((p) => p["id"] == postId);
   if (index == -1) return;
 
   final post = state.posts[index];
@@ -145,42 +159,45 @@ Future<void> toggleVote(dynamic state, int postId, int vote) async {
       data: {"vote": vote},
     );
 
-    final data = res.data;
+    final api =
+    ApiHelper.parse<Map<String, dynamic>>(
+      res,
+          (json) => Map<String, dynamic>.from(json),
+    );
 
-    // Backend authoritative response ile state güncelle
-    if (data != null) {
-      state.setState(() {
-        post["user_vote"] = data["userVote"];
-        post["votes_count"] = data["score"];
-      });
-    }
+    final voteData = api.data;
+
+    if (voteData == null) return;
+
+    state.setState(() {
+      post["user_vote"] = voteData["userVote"] ?? 0;
+      post["votes_count"] = voteData["score"] ?? 0;
+    });
   } catch (e) {
-    // Hata durumunda kullanıcıya bildirim verebilirsin
     ScaffoldMessenger.of(state.context).showSnackBar(
-      SnackBar(content: Text("Oy verilemedi: $e")),
+      SnackBar(
+        content: Text("Oy verilemedi: $e"),
+      ),
     );
   }
 }
 
-
-
-
-
-
-
 /// =======================================================
-/// TOGGLE SAVE (API ONLY)
+/// TOGGLE SAVE
+/// =======================================================
 Future<void> toggleSave(
     dynamic state,
     int postId,
     bool currentlySaved,
     ) async {
-  final index = state.posts.indexWhere((p) => p["id"] == postId);
+  final index =
+  state.posts.indexWhere((p) => p["id"] == postId);
+
   if (index == -1) return;
 
-  // 🔥 optimistic update
   state.setState(() {
-    state.posts[index]["is_saved"] = !currentlySaved;
+    state.posts[index]["is_saved"] =
+    !currentlySaved;
   });
 
   try {
@@ -189,28 +206,29 @@ Future<void> toggleSave(
       data: {"postId": postId},
     );
 
-    // 🔥 ApiResponse kontrolü
-    if (res.data["success"] == false) {
-      throw Exception(res.data["message"]);
-    }
+    final api =
+    ApiHelper.parse<Map<String, dynamic>>(
+      res,
+          (json) => Map<String, dynamic>.from(json),
+    );
 
-    final saved = res.data["data"]["saved"] ?? false;
+    final saved =
+        api.data?["saved"] ?? false;
 
-    // 🔥 gerçek sonucu set et
     state.setState(() {
       state.posts[index]["is_saved"] = saved;
     });
-
   } catch (e) {
-    // 🔥 rollback
     state.setState(() {
-      state.posts[index]["is_saved"] = currentlySaved;
+      state.posts[index]["is_saved"] =
+          currentlySaved;
     });
 
-    debugPrint("TOGGLE SAVE ERROR: $e");
+    debugPrint(
+      "TOGGLE SAVE ERROR: $e",
+    );
   }
 }
-
 /// =======================================================
 /// NAVIGATION
 /// =======================================================

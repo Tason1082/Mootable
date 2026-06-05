@@ -33,6 +33,18 @@ class ConversationService {
         .map((e) => MessageModel.fromJson(e))
         .toList();
   }
+  static Future<List<ConversationListModel>> getModMail() async {
+    final res = await ApiClient.dio.get("/api/conversations");
+
+    final data = res.data as List;
+
+    return data
+        .map((e) => ConversationListModel.fromJson(e))
+        .where((c) =>
+    c.name.startsWith("community:") ||
+        c.isGroup == false && c.name.contains("community"))
+        .toList();
+  }
   // CREATE
   static Future<int> create({
     String? title,

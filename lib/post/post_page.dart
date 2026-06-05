@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_client.dart';
+import '../core/api_service.dart';
 import '../core/auth_service.dart';
 
 class PostAddPage extends StatefulWidget {
@@ -39,21 +40,22 @@ class _PostAddPageState extends State<PostAddPage> {
   // ================= COMMUNITY =================
   Future<void> _fetchCommunities() async {
     try {
-      final response = await ApiClient.dio.get("/api/communities");
-
-      final data = response.data;
-      List listData = data is List ? data : data["data"];
+      final data = await ApiService.getMyCommunities();
 
       setState(() {
-        _communities = listData.map((e) => {
+        _communities = data.map((e) => {
           "id": e["id"].toString(),
           "name": e["name"],
         }).toList();
+
         _loadingCommunities = false;
       });
     } catch (e) {
       debugPrint("Topluluk çekme hatası: $e");
-      setState(() => _loadingCommunities = false);
+
+      setState(() {
+        _loadingCommunities = false;
+      });
     }
   }
 
