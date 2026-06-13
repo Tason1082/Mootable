@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:mootable/post/post_card.dart';
-import '../core/api_client.dart';
-import '../core/auth_service.dart';
+import 'package:mootable/users/user_service.dart';
+import '../../core/api_client.dart';
+import '../../core/auth_service.dart';
 import 'edit_profile_page.dart';
-import 'home/home_page_functions.dart';
+import '../home/home_page_functions.dart';
 
 class ProfilePage extends StatefulWidget {
 
@@ -31,40 +32,16 @@ class _ProfilePageState extends State<ProfilePage>
 
   Future<void> _loadProfile() async {
     try {
-      final userRes = await ApiClient.dio.get(
-        '/api/users/username/${widget.username}',
-      );
-
-      final postRes = await ApiClient.dio.get(
-        '/api/posts/user/${widget.username}',
-      );
-
-      // 🔥 OUTER RESPONSE MAP
-     final Map<String, dynamic> body =
-      Map<String, dynamic>.from(postRes.data);
-
-      // 🔥 INNER LIST
-      final List rawList = body["data"] as List;
-
-      final mappedPosts = rawList.map((p) {
-        final map = Map<String, dynamic>.from(p);
-
-        return {
-          ...map,
-          "votes_count": map["netScore"] ?? 0,
-          "user_vote": map["userVote"] ?? 0,
-          "created_at": map["createdAt"],
-          "community": map["community"],
-          "communityId": map["communityId"],
-          "comment_count": map["commentCount"] ?? 0,
-        };
-      }).toList();
+      final results = await Future.wait([
+        UserService.getUserByUsername(widget.username),
+        UserService.getUserPosts(widget.username),
+      ]);
 
       if (!mounted) return;
 
       setState(() {
-        user = Map<String, dynamic>.from(userRes.data);
-        posts = mappedPosts;
+        user = results[0] as Map<String, dynamic>;
+        posts = results[1] as List<Map<String, dynamic>>;
         loading = false;
       });
     } catch (e) {

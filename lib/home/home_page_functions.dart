@@ -56,6 +56,7 @@ Future<void> fetchPosts(
         "communityName": p["communityName"],
         "medias": p["medias"] ?? [],
         "commentCount": p["commentCount"] ?? 0,
+
       };
 
       final postId = mappedPost["id"];

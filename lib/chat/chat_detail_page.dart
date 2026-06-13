@@ -4,8 +4,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../TimeAgo.dart';
-import '../core/api_navigation.dart';
-import '../core/api_service.dart';
 
 
 import '../home/home_page.dart';
@@ -127,6 +125,43 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
     _scrollToBottom();
   }
+  bool _shouldShowDateHeader(int index) {
+    if (index == 0) return true;
+
+    final current = messages[index].createdAt;
+    final previous = messages[index - 1].createdAt;
+
+    return current.year != previous.year ||
+        current.month != previous.month ||
+        current.day != previous.day;
+  }
+  String _formatDateHeader(DateTime date) {
+    const months = [
+      '',
+      'Ocak',
+      'Şubat',
+      'Mart',
+      'Nisan',
+      'Mayıs',
+      'Haziran',
+      'Temmuz',
+      'Ağustos',
+      'Eylül',
+      'Ekim',
+      'Kasım',
+      'Aralık',
+    ];
+
+    final now = DateTime.now();
+
+    // Bu yıl içindeyse
+    if (date.year == now.year) {
+      return "${date.day} ${months[date.month]}";
+    }
+
+    // Geçmiş yıllarsa yılı da göster
+    return "${date.day} ${months[date.month]} ${date.year}";
+  }
   Future<void> _send() async {
     final text = controller.text.trim();
 
@@ -213,7 +248,39 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                 final isMe =
                     msg.senderId == myUserId;
 
-                return Align(
+                return Column(
+                    children: [
+
+                    if (_shouldShowDateHeader(i))
+                Padding(
+                padding: const EdgeInsets.symmetric(
+                vertical: 12,
+                ),
+                child: Center(
+                child: Container(
+                padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius:
+                BorderRadius.circular(20),
+                ),
+                child: Text(
+                _formatDateHeader(
+                msg.createdAt,
+                ),
+                style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                ),
+                ),
+                ),
+                ),
+                ),
+
+                Align(
                   alignment: isMe
                       ? Alignment.centerRight
                       : Alignment.centerLeft,
@@ -572,8 +639,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                           ],
                         ),
                       ),
+
                     ],
                   ),
+                ),
+                    ],
                 );
               },
             ),

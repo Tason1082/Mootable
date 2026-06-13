@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/api_service.dart';
-import '../profile_page.dart';
+import '../users/profile_page.dart';
 
 class SendInvitePage extends StatefulWidget {
   final int roomId;

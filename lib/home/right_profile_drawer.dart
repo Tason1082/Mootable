@@ -4,8 +4,8 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/auth_service.dart';
 import '../core/api_client.dart';
 
-import '../edit_profile_page.dart';
-import '../profile_page.dart';
+import '../users/edit_profile_page.dart';
+import '../users/profile_page.dart';
 import '../post/saved_posts_page.dart';
 import '../settings_page.dart';
 import '../core/login_page.dart';

@@ -7,7 +7,7 @@ import 'package:mootable/voice/voice_service.dart';
 
 import '../core/api_service.dart';
 import '../core/auth_service.dart';
-import '../profile_page.dart';
+import '../users/profile_page.dart';
 
 
 

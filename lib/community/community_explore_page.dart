@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../core/api_client.dart';
+
 import '../my_community/community_detail_page.dart';
 import '../theme/app_theme.dart';
+import 'community_service.dart';
 
 class CommunityExplorePage extends StatefulWidget {
   const CommunityExplorePage({super.key});
@@ -53,9 +55,7 @@ class _CommunityExplorePageState
 
   Future<void> _joinCommunity(String id) async {
     try {
-      await ApiClient.dio.post(
-        "/api/communities/$id/join",
-      );
+      await CommunityService.joinCommunity(id);
 
       final joined = allCommunities.firstWhere(
             (c) => c["id"] == id,
@@ -71,9 +71,7 @@ class _CommunityExplorePageState
 
   Future<void> _leaveCommunity(String id) async {
     try {
-      await ApiClient.dio.delete(
-        "/api/communities/$id/leave",
-      );
+      await CommunityService.leaveCommunity(id);
 
       setState(() {
         userJoinedCommunities.removeWhere(
@@ -87,14 +85,8 @@ class _CommunityExplorePageState
 
   Future<void> _loadAllCommunities() async {
     try {
-      final response = await ApiClient.dio.get(
-        "/api/communities",
-      );
-
       allCommunities =
-      List<Map<String, dynamic>>.from(
-        response.data["data"],
-      );
+      await CommunityService.getAllCommunities();
     } catch (_) {
       allCommunities = [];
     }
@@ -103,20 +95,12 @@ class _CommunityExplorePageState
   Future<void> _loadCategoriesFromApi() async {
     try {
       final locale =
-          Localizations.localeOf(context)
-              .languageCode;
-
-      final response = await ApiClient.dio.get(
-        "/api/categories",
-        queryParameters: {
-          "locale": locale,
-        },
-      );
-
-      final List data = response.data;
+          Localizations.localeOf(context).languageCode;
 
       categories =
-      List<Map<String, dynamic>>.from(data);
+      await CommunityService.getCategories(
+        locale: locale,
+      );
 
       categoryTopics.clear();
 
@@ -139,15 +123,8 @@ class _CommunityExplorePageState
 
   Future<void> _loadRecommended() async {
     try {
-      final response =
-      await ApiClient.dio.get(
-        "/api/communities/recommended",
-      );
-
       recommended =
-      List<Map<String, dynamic>>.from(
-        response.data["data"],
-      );
+      await CommunityService.getRecommendedCommunities();
     } catch (_) {
       recommended = [];
     }

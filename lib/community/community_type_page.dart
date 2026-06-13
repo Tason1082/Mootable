@@ -7,6 +7,7 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 import '../core/api_client.dart';
 import '../home/home_page.dart';
+import 'community_service.dart';
 //4
 class CommunityTypePage extends StatefulWidget {
   final String name;
@@ -37,78 +38,60 @@ class _CommunityTypePageState extends State<CommunityTypePage> {
     setState(() => isLoading = true);
 
     try {
-      /// 1️⃣ COMMUNITY CREATE
-      final response = await ApiClient.dio.post(
-        "/api/communities",
-        data: {
-          "name": widget.name,
-          "description": widget.description,
-          "topics": widget.selectedTopics
-              .map((t) => t.toLowerCase())
-              .toList(),
-          "type": communityType,
-          "isAdult": isAdult,
-        },
+      final communityId =
+      await CommunityService.createCommunity(
+        name: widget.name,
+        description: widget.description,
+        topics: widget.selectedTopics,
+        type: communityType,
+        isAdult: isAdult,
       );
 
-      final communityId = response.data["data"]["id"];
-
-      /// 2️⃣ BANNER UPLOAD
       if (widget.bannerUrl != null) {
-        await _uploadImage(
-          communityId,
-          widget.bannerUrl!,
-          "banner",
+        await CommunityService.uploadImage(
+          communityId: communityId,
+          filePath: widget.bannerUrl!,
+          type: "banner",
         );
       }
 
-      /// 3️⃣ ICON UPLOAD
       if (widget.iconUrl != null) {
-        await _uploadImage(
-          communityId,
-          widget.iconUrl!,
-          "icon",
+        await CommunityService.uploadImage(
+          communityId: communityId,
+          filePath: widget.iconUrl!,
+          type: "icon",
         );
       }
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.community_created)),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)!.community_created,
+          ),
+        ),
       );
 
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (_) => const HomePage()),
+        MaterialPageRoute(
+          builder: (_) => const HomePage(),
+        ),
             (_) => false,
       );
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Error: $e")),
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
-  Future<void> _uploadImage(
-      String communityId,
-      String filePath,
-      String type,
-      ) async {
-    final fileName = filePath.split('/').last;
-
-    FormData formData = FormData.fromMap({
-      "file": await MultipartFile.fromFile(
-        filePath,
-        filename: fileName,
-      ),
-      "type": type,
-    });
-
-    await ApiClient.dio.post(
-      "/api/communities/$communityId/upload-image",
-      data: formData,
-    );
-  }
-
 
   @override
   Widget build(BuildContext context) {

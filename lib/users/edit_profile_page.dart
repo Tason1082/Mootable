@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:mootable/personal_info_page.dart';
 import 'package:mootable/post/my_post_page.dart';
-import '../core/auth_service.dart';
-import '../core/api_client.dart';
-import 'error/error_handler.dart';
+import 'package:mootable/users/user_service.dart';
+import '../../core/auth_service.dart';
+import '../../core/api_client.dart';
+import '../error/error_handler.dart';
 
 class EditProfilePage extends StatefulWidget {
   final String? initialUsername;
@@ -48,9 +49,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
   Future<void> _fetchUser() async {
     try {
-      final res = await ApiClient.dio.get('/api/users/me');
-
-      final data = res.data;
+      final data = await UserService.getMe();
 
       if (!mounted) return;
 
@@ -59,7 +58,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _bioController.text = data['bio'] ?? '';
       });
     } catch (e) {
-      // opsiyonel hata yönetimi
+      // hata yönetimi
     }
   }
   Future<void> _saveProfile() async {
@@ -83,9 +82,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
         data['bio'] = bio;
       }
 
-      await ApiClient.dio.put(
-        '/api/users', // ✅ düzeltildi
-        data: data,
+      await UserService.updateProfile(
+        username: _usernameController.text,
+        bio: _bioController.text,
       );
 
       if (mounted) {
