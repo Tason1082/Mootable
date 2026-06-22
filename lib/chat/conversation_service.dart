@@ -14,7 +14,19 @@ class ConversationService {
         .map((e) => ConversationListModel.fromJson(e))
         .toList();
   }
+  static Future<List<MessageModel>> getCommunityMessages(
+      String communityId,
+      ) async {
+    final res = await ApiClient.dio.get(
+      "/api/messages/community/$communityId",
+    );
 
+    final data = res.data["data"] as List;
+
+    return data
+        .map((e) => MessageModel.fromJson(e))
+        .toList();
+  }
   // HISTORY
   static Future<List<MessageModel>> getHistory(
       int conversationId,

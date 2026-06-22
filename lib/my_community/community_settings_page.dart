@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/api_client.dart';
+import 'community_mail.dart';
 
 class CommunitySettingsPage extends StatefulWidget {
   final Map<String, dynamic> community;
@@ -298,6 +299,26 @@ class _CommunitySettingsPageState
                   ),
                 )
                     : const Text("Kaydet"),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.mail_outline),
+                label: const Text("Gelen Mesajlar"),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CommunityMailPage(
+                        communityId: widget.community['id'].toString(),
+
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],
